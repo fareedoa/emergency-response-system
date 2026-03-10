@@ -1,10 +1,10 @@
-package com.emergency.dispatch_system;
+package com.emergency.auth_service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class EmergencyDispatchSystemApplicationTests {
+class AuthServiceApplicationTests {
 
 	@Test
 	void contextLoads() {
