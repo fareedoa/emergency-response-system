@@ -18,8 +18,8 @@ public class TokenBlacklistService {
 
     public void blacklist(String token, long remainingMs) {
         if (remainingMs > 0) {
-            redisTemplate.opsForValue()
-                    .set(BLACKLIST_PREFIX + token, "revoked", Duration.ofMillis(remainingMs));
+                redisTemplate.opsForValue()
+                        .set(BLACKLIST_PREFIX + token, "revoked", Duration.ofMillis(remainingMs));
         }
     }
 
