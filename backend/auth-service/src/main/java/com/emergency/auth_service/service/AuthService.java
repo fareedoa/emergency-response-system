@@ -90,6 +90,9 @@ public class AuthService {
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        user.setLastLogin(java.time.LocalDateTime.now());
+        userRepository.save(user);
+
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
         return AuthResponse.builder()
@@ -137,6 +140,8 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .createdDate(user.getCreatedDate())
+                .updatedAt(user.getUpdatedAt())
+                .lastLogin(user.getLastLogin())
                 .build();
     }
 

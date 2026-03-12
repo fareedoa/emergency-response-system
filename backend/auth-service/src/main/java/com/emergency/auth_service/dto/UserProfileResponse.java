@@ -20,4 +20,6 @@ public class UserProfileResponse {
     private String email;
     private Role role;
     private LocalDateTime createdDate;
+    private LocalDateTime updatedAt;
+    private LocalDateTime lastLogin;
 }

@@ -44,7 +44,6 @@ public class IncidentService {
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .notes(request.getNotes())
-                .createdBy(request.getCreatedBy())
                 .status(IncidentStatus.CREATED)
                 .build();
 

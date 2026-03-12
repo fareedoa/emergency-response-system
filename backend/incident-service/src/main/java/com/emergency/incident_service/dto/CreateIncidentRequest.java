@@ -33,8 +33,4 @@ public class CreateIncidentRequest {
 
     @Schema(description = "Additional notes about the incident", example = "Suspect seen fleeing on foot")
     private String notes;
-
-    @NotNull(message = "Administrator ID is required")
-    @Schema(description = "UUID of the admin creating this report", example = "a7b3c1d2-e4f5-6789-abcd-ef0123456789")
-    private UUID createdBy;
 }

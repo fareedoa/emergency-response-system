@@ -32,8 +32,8 @@ public class IncidentResponse {
     @Schema(description = "Additional notes")
     private String notes;
 
-    @Schema(description = "Admin ID who created the report")
-    private UUID createdBy;
+    @Schema(description = "Username or ID who created the report")
+    private String createdBy;
 
     @Schema(description = "UUID of the responder unit assigned to this incident")
     private UUID assignedUnit;
