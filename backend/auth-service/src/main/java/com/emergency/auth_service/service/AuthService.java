@@ -144,7 +144,37 @@ public class AuthService {
                 .lastLogin(user.getLastLogin())
                 .build();
     }
+    @Transactional
+    public UserProfileResponse updateProfile(String email, UpdateProfileRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
+        user.setName(request.getName());
+        user = userRepository.save(user);
+
+        return UserProfileResponse.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .createdDate(user.getCreatedDate())
+                .updatedAt(user.getUpdatedAt())
+                .lastLogin(user.getLastLogin())
+                .build();
+    }
+
+    @Transactional
+    public void updatePassword(String email, UpdatePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Invalid old password");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
     @Transactional
     public void logout(String email, String accessToken) {
         // 1. Blacklist the access token in Redis (auto-expires at token TTL)

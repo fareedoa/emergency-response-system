@@ -2,6 +2,7 @@ package com.emergency.incident_service.domain.model;
 
 import com.emergency.incident_service.domain.enums.IncidentStatus;
 import com.emergency.incident_service.domain.enums.IncidentType;
+import com.emergency.incident_service.domain.enums.Severity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -10,6 +11,7 @@ import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.hibernate.envers.Audited;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -17,6 +19,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "incidents")
 @EntityListeners(AuditingEntityListener.class)
+@Audited
 @Getter
 @Setter
 @NoArgsConstructor
@@ -35,6 +38,13 @@ public class Incident {
     @Enumerated(EnumType.STRING)
     @Column(name = "incident_type", nullable = false)
     private IncidentType incidentType;
+
+    @Column(name = "other_incident_type")
+    private String otherIncidentType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "severity")
+    private Severity severity;
 
     @Column(name = "latitude", nullable = false)
     private Double latitude;

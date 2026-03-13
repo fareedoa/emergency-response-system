@@ -1,6 +1,7 @@
 package com.emergency.incident_service.dto;
 
 import com.emergency.incident_service.domain.enums.IncidentType;
+import com.emergency.incident_service.domain.enums.Severity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -16,8 +17,15 @@ public class CreateIncidentRequest {
     private String citizenName;
 
     @NotNull(message = "Incident type is required")
-    @Schema(description = "Type of incident (ROBBERY, CRIME, FIRE, MEDICAL_EMERGENCY)", example = "ROBBERY")
+    @Schema(description = "Type of incident (ACCIDENT, CRIME, FIRE, MEDICAL_EMERGENCY, OTHER)", example = "ROBBERY")
     private IncidentType incidentType;
+
+    @Schema(description = "Description if incident type is OTHER", example = "Chemical Spill")
+    private String otherIncidentType;
+
+    @NotNull(message = "Severity is required")
+    @Schema(description = "Severity of the incident", example = "HIGH")
+    private Severity severity;
 
     @NotNull(message = "Latitude is required")
     @DecimalMin(value = "-90.0", message = "Latitude must be >= -90")

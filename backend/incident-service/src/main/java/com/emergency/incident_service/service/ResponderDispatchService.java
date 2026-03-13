@@ -48,7 +48,8 @@ public class ResponderDispatchService {
         return switch (incidentType) {
             case ROBBERY, CRIME      -> ResponderType.POLICE;
             case FIRE                -> ResponderType.FIRE;
-            case MEDICAL_EMERGENCY   -> ResponderType.AMBULANCE;
+            case MEDICAL_EMERGENCY, ACCIDENT   -> ResponderType.AMBULANCE;
+            case OTHER -> null;
         };
     }
 }

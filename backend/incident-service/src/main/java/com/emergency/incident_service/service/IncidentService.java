@@ -15,6 +15,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+
+import jakarta.persistence.EntityManager;
+import org.hibernate.envers.AuditReader;
+import org.hibernate.envers.AuditReaderFactory;
+import org.hibernate.envers.query.AuditEntity;
+import org.hibernate.envers.query.AuditQuery;
+import org.hibernate.envers.RevisionType;
+
+import com.emergency.incident_service.config.UserRevisionEntity;
+import com.emergency.incident_service.dto.IncidentTimelineResponse;
 
 @Service
 public class IncidentService {
@@ -22,13 +33,16 @@ public class IncidentService {
     private final IncidentRepository incidentRepository;
     private final ResponderRepository responderRepository;
     private final ResponderDispatchService dispatchService;
+    private final EntityManager entityManager;
 
     public IncidentService(IncidentRepository incidentRepository,
                            ResponderRepository responderRepository,
-                           ResponderDispatchService dispatchService) {
+                           ResponderDispatchService dispatchService,
+                           EntityManager entityManager) {
         this.incidentRepository = incidentRepository;
         this.responderRepository = responderRepository;
         this.dispatchService = dispatchService;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -41,6 +55,8 @@ public class IncidentService {
         Incident incident = Incident.builder()
                 .citizenName(request.getCitizenName())
                 .incidentType(request.getIncidentType())
+                .otherIncidentType(request.getOtherIncidentType())
+                .severity(request.getSeverity())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .notes(request.getNotes())
@@ -84,6 +100,75 @@ public class IncidentService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /** GET /incidents – all incidents */
+    @Transactional(readOnly = true)
+    public List<IncidentResponse> getAllIncidents() {
+        return incidentRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /** DELETE /incidents/:id */
+    @Transactional
+    public void deleteIncident(UUID id) {
+        Incident incident = findOrThrow(id);
+
+        if (incident.getAssignedUnit() != null) {
+            responderRepository.findById(incident.getAssignedUnit())
+                    .ifPresent(r -> {
+                        r.setAvailable(true);
+                        responderRepository.save(r);
+                    });
+        }
+        incidentRepository.delete(incident);
+    }
+
+    /** GET /incidents/:id/notes */
+    @Transactional(readOnly = true)
+    public String getIncidentNotes(UUID id) {
+        Incident incident = findOrThrow(id);
+        return incident.getNotes() != null ? incident.getNotes() : "";
+    }
+
+    /** GET /incidents/:id/responders/nearest */
+    @Transactional(readOnly = true)
+    public Responder getNearestResponderForIncident(UUID id) {
+        Incident incident = findOrThrow(id);
+        return dispatchService.findNearestAvailableResponder(
+                incident.getIncidentType(),
+                incident.getLatitude(),
+                incident.getLongitude()
+        );
+    }
+
+    /** GET /incidents/:id/timeline */
+    @Transactional(readOnly = true)
+    public List<IncidentTimelineResponse> getIncidentTimeline(UUID id) {
+        AuditReader auditReader = AuditReaderFactory.get(entityManager);
+        
+        AuditQuery query = auditReader.createQuery()
+                .forRevisionsOfEntity(Incident.class, false, true)
+                .add(AuditEntity.id().eq(id));
+
+        List<Object[]> results = query.getResultList();
+
+        return results.stream().map(result -> {
+            Incident auditedIncident = (Incident) result[0];
+            UserRevisionEntity revisionEntity = (UserRevisionEntity) result[1];
+            RevisionType revisionType = (RevisionType) result[2];
+
+            return IncidentTimelineResponse.builder()
+                    .status(auditedIncident.getStatus())
+                    .modifiedBy(revisionEntity.getUsername())
+                    .modifiedAt(java.time.Instant.ofEpochMilli(revisionEntity.getTimestamp())
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalDateTime())
+                    .updateType(revisionType.name())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     /** PUT /incidents/:id/status */
@@ -147,6 +232,8 @@ public class IncidentService {
                 .id(i.getId())
                 .citizenName(i.getCitizenName())
                 .incidentType(i.getIncidentType())
+                .otherIncidentType(i.getOtherIncidentType())
+                .severity(i.getSeverity())
                 .latitude(i.getLatitude())
                 .longitude(i.getLongitude())
                 .notes(i.getNotes())

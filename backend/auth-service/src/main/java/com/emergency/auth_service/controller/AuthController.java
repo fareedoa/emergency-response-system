@@ -62,6 +62,28 @@ public class AuthController {
         return ResponseEntity.ok(profile);
     }
 
+    @PutMapping("/profile")
+    @Operation(summary = "Update current user profile",
+               description = "Updates the name of the currently authenticated user.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<UserProfileResponse> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UserProfileResponse profile = authService.updateProfile(userDetails.getUsername(), request);
+        return ResponseEntity.ok(profile);
+    }
+
+    @PutMapping("/password")
+    @Operation(summary = "Change password",
+               description = "Allows an authenticated user to change their password.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<Map<String, String>> updatePassword(
+            @Valid @RequestBody UpdatePasswordRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        authService.updatePassword(userDetails.getUsername(), request);
+        return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
+    }
+
     @PostMapping("/logout")
     @Operation(summary = "Logout and revoke tokens",
                description = "Blacklists the current access token in Redis and deletes the user's refresh token from the database.")

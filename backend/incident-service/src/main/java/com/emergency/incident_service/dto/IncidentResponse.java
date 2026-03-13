@@ -2,6 +2,7 @@ package com.emergency.incident_service.dto;
 
 import com.emergency.incident_service.domain.enums.IncidentStatus;
 import com.emergency.incident_service.domain.enums.IncidentType;
+import com.emergency.incident_service.domain.enums.Severity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
@@ -22,6 +23,12 @@ public class IncidentResponse {
 
     @Schema(description = "Category of the emergency")
     private IncidentType incidentType;
+
+    @Schema(description = "Description if incident type is OTHER")
+    private String otherIncidentType;
+
+    @Schema(description = "Severity of the incident")
+    private Severity severity;
 
     @Schema(description = "Incident latitude")
     private Double latitude;

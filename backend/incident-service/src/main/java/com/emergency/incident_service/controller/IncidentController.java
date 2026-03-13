@@ -73,6 +73,19 @@ public class IncidentController {
     }
 
     /**
+     * GET /incidents
+     */
+    @GetMapping
+    @PreAuthorize(HAS_ANY_ADMIN_ROLE)
+    @Operation(
+        summary = "Get all incidents",
+        description = "Returns all incidents regardless of status."
+    )
+    public ResponseEntity<List<IncidentResponse>> getAllIncidents() {
+        return ResponseEntity.ok(incidentService.getAllIncidents());
+    }
+
+    /**
      * GET /incidents/:id
      */
     @GetMapping("/{id}")
@@ -83,6 +96,59 @@ public class IncidentController {
     )
     public ResponseEntity<IncidentResponse> getIncident(@PathVariable UUID id) {
         return ResponseEntity.ok(incidentService.getIncident(id));
+    }
+
+    /**
+     * DELETE /incidents/:id
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @Operation(
+        summary = "Delete incident",
+        description = "Deletes an incident and frees any assigned responder. Requires SYSTEM_ADMIN role."
+    )
+    public ResponseEntity<Void> deleteIncident(@PathVariable UUID id) {
+        incidentService.deleteIncident(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /incidents/:id/notes
+     */
+    @GetMapping("/{id}/notes")
+    @PreAuthorize(HAS_ANY_ADMIN_ROLE)
+    @Operation(
+        summary = "Get incident notes",
+        description = "Retrieves the notes associated with a specific incident."
+    )
+    public ResponseEntity<String> getIncidentNotes(@PathVariable UUID id) {
+        return ResponseEntity.ok(incidentService.getIncidentNotes(id));
+    }
+
+    /**
+     * GET /incidents/:id/responders/nearest
+     */
+    @GetMapping("/{id}/responders/nearest")
+    @PreAuthorize(HAS_ANY_ADMIN_ROLE)
+    @Operation(
+        summary = "Get nearest responders",
+        description = "Finds and returns the nearest available responder based on the incident type and location."
+    )
+    public ResponseEntity<com.emergency.incident_service.domain.model.Responder> getNearestResponder(@PathVariable UUID id) {
+        return ResponseEntity.ok(incidentService.getNearestResponderForIncident(id));
+    }
+
+    /**
+     * GET /incidents/:id/timeline
+     */
+    @GetMapping("/{id}/timeline")
+    @PreAuthorize(HAS_ANY_ADMIN_ROLE)
+    @Operation(
+        summary = "Get incident timeline",
+        description = "Retrieves the complete audit history of an incident's status and modifications."
+    )
+    public ResponseEntity<List<com.emergency.incident_service.dto.IncidentTimelineResponse>> getIncidentTimeline(@PathVariable UUID id) {
+        return ResponseEntity.ok(incidentService.getIncidentTimeline(id));
     }
 
     /**

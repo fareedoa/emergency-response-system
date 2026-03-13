@@ -44,3 +44,9 @@ logging:
   level:
     com.emergency.incident_service: INFO
     org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
