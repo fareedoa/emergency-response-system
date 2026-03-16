@@ -1,0 +1,142 @@
+/* ═══════════════════════════════════════════════════════
+   SwiftAid DESIGN SYSTEM
+   Theme: Deep Navy Command Center with Amber Highlights
+   Fonts: Sora (display) + Inter (body) + JetBrains Mono
+═══════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Core Backgrounds ── */
+  --bg-void:       #04060D;
+  --bg-base:       #070B18;
+  --bg-surface:    #0C1225;
+  --bg-raised:     #111A33;
+  --bg-overlay:    #162040;
+  --bg-hover:      #1C2B50;
+
+  /* ── Brand Accent: Amber/Gold ── */
+  --amber:         #F59E0B;
+  --amber-bright:  #FCD34D;
+  --amber-soft:    rgba(245,158,11,0.15);
+  --amber-glow:    rgba(245,158,11,0.35);
+  --amber-border:  rgba(245,158,11,0.25);
+
+  /* ── Secondary Accent: Cyan ── */
+  --cyan:          #22D3EE;
+  --cyan-soft:     rgba(34,211,238,0.12);
+  --cyan-glow:     rgba(34,211,238,0.3);
+  --cyan-border:   rgba(34,211,238,0.2);
+
+  /* ── Status Colors ── */
+  --green:         #10B981;
+  --green-soft:    rgba(16,185,129,0.12);
+  --red:           #EF4444;
+  --red-soft:      rgba(239,68,68,0.12);
+  --orange:        #F97316;
+  --orange-soft:   rgba(249,115,22,0.12);
+  --violet:        #8B5CF6;
+  --violet-soft:   rgba(139,92,246,0.12);
+  --sky:           #38BDF8;
+
+  /* ── Text ── */
+  --text-primary:   #F0F6FF;
+  --text-secondary: #7B92B8;
+  --text-muted:     #3D5070;
+  --text-amber:     #F59E0B;
+  --text-cyan:      #22D3EE;
+
+  /* ── Borders ── */
+  --border-faint:   rgba(255,255,255,0.04);
+  --border-subtle:  rgba(255,255,255,0.07);
+  --border-normal:  rgba(255,255,255,0.12);
+  --border-strong:  rgba(255,255,255,0.2);
+
+  /* ── Typography ── */
+  --font-display: 'Sora', sans-serif;
+  --font-body:    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  /* ── Radii ── */
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  16px;
+  --r-xl:  24px;
+
+  /* ── Shadows ── */
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.5);
+  --shadow-md:    0 4px 20px rgba(0,0,0,0.6);
+  --shadow-lg:    0 8px 40px rgba(0,0,0,0.7);
+  --shadow-amber: 0 0 24px rgba(245,158,11,0.2);
+  --shadow-cyan:  0 0 24px rgba(34,211,238,0.15);
+
+  /* ── Layout ── */
+  --sidebar-w:   252px;
+  --topbar-h:    60px;
+
+  /* ── Motion ── */
+  --ease-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-slow:   400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--bg-overlay); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-normal); }
+
+/* ── Selection ── */
+::selection { background: var(--amber-soft); color: var(--amber-bright); }
+
+/* ── Links ── */
+a { color: var(--cyan); text-decoration: none; }
+button { cursor: pointer; border: none; background: none; font-family: inherit; }
+input, select, textarea { font-family: inherit; }
+h1,h2,h3,h4,h5,h6 { font-family: var(--font-display); font-weight: 700; line-height: 1.2; }
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(10px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity:0; }
+  to   { opacity:1; }
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50% { opacity:0.4; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes slideLeft {
+  from { opacity:0; transform: translateX(-12px); }
+  to   { opacity:1; transform: translateX(0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes scandown {
+  0% { top: 0; opacity: 0; }
+  10% { opacity:1; }
+  90% { opacity:1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.anim-fadeUp { animation: fadeUp var(--ease-slow) forwards; }
+.anim-spin { animation: spin 1s linear infinite; }
