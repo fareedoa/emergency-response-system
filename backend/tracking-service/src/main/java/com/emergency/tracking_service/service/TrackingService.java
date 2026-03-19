@@ -5,8 +5,13 @@ import com.emergency.tracking_service.domain.model.VehicleLocation;
 import com.emergency.tracking_service.dto.LocationUpdateRequest;
 import com.emergency.tracking_service.dto.VehicleLocationResponse;
 import com.emergency.tracking_service.exception.ResourceNotFoundException;
+import com.emergency.tracking_service.messaging.RabbitMQConfig;
+import com.emergency.tracking_service.messaging.events.VehicleLocationEvent;
 import com.emergency.tracking_service.repository.VehicleLocationRepository;
 import com.emergency.tracking_service.repository.VehicleRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,16 +24,21 @@ import java.util.UUID;
 @Service
 public class TrackingService {
 
+    private static final Logger log = LoggerFactory.getLogger(TrackingService.class);
+
     private final VehicleLocationRepository locationRepository;
     private final VehicleRepository vehicleRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final RabbitTemplate rabbitTemplate;
 
     public TrackingService(VehicleLocationRepository locationRepository,
                            VehicleRepository vehicleRepository,
-                           SimpMessagingTemplate messagingTemplate) {
+                           SimpMessagingTemplate messagingTemplate,
+                           RabbitTemplate rabbitTemplate) {
         this.locationRepository = locationRepository;
         this.vehicleRepository = vehicleRepository;
         this.messagingTemplate = messagingTemplate;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     @Transactional
@@ -62,12 +72,31 @@ public class TrackingService {
         VehicleLocationResponse response = toResponse(locationRecord);
 
         // 2. Broadcast via WebSocket
-        // General vehicle tracking topic
         messagingTemplate.convertAndSend("/topic/vehicles/" + vehicleId, response);
-        
-        // If assigned to an incident, broadcast to incident-specific topic
         if (locationRecord.getIncidentId() != null) {
             messagingTemplate.convertAndSend("/topic/incidents/" + locationRecord.getIncidentId() + "/tracking", response);
+        }
+
+        // 3. Publish to RabbitMQ: vehicle.location.<vehicleId>
+        try {
+            VehicleLocationEvent event = VehicleLocationEvent.builder()
+                    .vehicleId(vehicleId)
+                    .registration(vehicle.getRegistration())
+                    .incidentId(locationRecord.getIncidentId() != null
+                            ? locationRecord.getIncidentId().toString() : null)
+                    .latitude(locationRecord.getLatitude())
+                    .longitude(locationRecord.getLongitude())
+                    .speedKmh(locationRecord.getSpeedKmh())
+                    .heading(locationRecord.getHeading())
+                    .recordedAt(locationRecord.getRecordedAt())
+                    .build();
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.EXCHANGE,
+                    RabbitMQConfig.RK_VEHICLE_LOCATION_PREFIX + vehicleId,
+                    event);
+        } catch (Exception e) {
+            log.warn("Failed to publish vehicle.location event for vehicleId={}: {}",
+                     vehicleId, e.getMessage());
         }
 
         return response;

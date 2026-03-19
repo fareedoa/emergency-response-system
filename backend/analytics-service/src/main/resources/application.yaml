@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: analytics-service
+  config:
+    import: optional:file:.env[.properties], optional:file:./backend/analytics-service/.env[.properties], optional:file:./analytics-service/.env[.properties]
+
+  # Primary datasource — incident-service tables
+  datasource:
+    incident:
+      jdbc-url: ${INCIDENT_DB_URL:${DATABASE_URL_INCIDENT}}
+      username: ${DATABASE_USERNAME}
+      password: ${DATABASE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+    tracking:
+      jdbc-url: ${TRACKING_DB_URL:${DATABASE_URL_TRACKING}}
+      username: ${DATABASE_USERNAME}
+      password: ${DATABASE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: false  # read-only service; no schema ownership
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-retries: 3
+
+server:
+  port: 8084
+
+app:
+  jwt:
+    secret: ${SECRET_KEY}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    com.emergency.analytics_service: INFO
+    org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

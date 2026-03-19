@@ -8,11 +8,18 @@ import com.emergency.incident_service.dto.CreateIncidentRequest;
 import com.emergency.incident_service.dto.IncidentResponse;
 import com.emergency.incident_service.dto.UpdateStatusRequest;
 import com.emergency.incident_service.exception.ResourceNotFoundException;
+import com.emergency.incident_service.messaging.RabbitMQConfig;
+import com.emergency.incident_service.messaging.events.IncidentCreatedEvent;
+import com.emergency.incident_service.messaging.events.IncidentStatusChangedEvent;
 import com.emergency.incident_service.repository.IncidentRepository;
 import com.emergency.incident_service.repository.ResponderRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -30,19 +37,24 @@ import com.emergency.incident_service.dto.IncidentTimelineResponse;
 @Service
 public class IncidentService {
 
+    private static final Logger log = LoggerFactory.getLogger(IncidentService.class);
+
     private final IncidentRepository incidentRepository;
     private final ResponderRepository responderRepository;
     private final ResponderDispatchService dispatchService;
     private final EntityManager entityManager;
+    private final RabbitTemplate rabbitTemplate;
 
     public IncidentService(IncidentRepository incidentRepository,
                            ResponderRepository responderRepository,
                            ResponderDispatchService dispatchService,
-                           EntityManager entityManager) {
+                           EntityManager entityManager,
+                           RabbitTemplate rabbitTemplate) {
         this.incidentRepository = incidentRepository;
         this.responderRepository = responderRepository;
         this.dispatchService = dispatchService;
         this.entityManager = entityManager;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     /**
@@ -65,6 +77,9 @@ public class IncidentService {
 
         incident = incidentRepository.save(incident);
 
+        // Publish incident.created event
+        publishCreatedEvent(incident);
+
         // Auto-dispatch: find nearest available responder
         try {
             Responder nearest = dispatchService.findNearestAvailableResponder(
@@ -79,6 +94,9 @@ public class IncidentService {
             incident.setAssignedUnit(nearest.getId());
             incident.setStatus(IncidentStatus.DISPATCHED);
             incident = incidentRepository.save(incident);
+
+            // Publish incident.dispatched event
+            publishStatusChangedEvent(incident, IncidentStatus.CREATED, IncidentStatus.DISPATCHED);
         } catch (ResourceNotFoundException e) {
             // No available responder — incident stays CREATED with no assignment
         }
@@ -188,13 +206,34 @@ public class IncidentService {
                     });
         }
 
-        return toResponse(incidentRepository.save(incident));
+        Incident saved = incidentRepository.save(incident);
+
+        // Publish incident.status.<STATUS> for analytics
+        publishStatusChangedEvent(saved, previousStatus, saved.getStatus());
+
+        // Also publish dedicated incident.resolved for tracking-service
+        if (saved.getStatus() == IncidentStatus.RESOLVED) {
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.EXCHANGE,
+                    RabbitMQConfig.RK_INCIDENT_RESOLVED,
+                    IncidentStatusChangedEvent.builder()
+                            .incidentId(saved.getId())
+                            .previousStatus(previousStatus)
+                            .newStatus(IncidentStatus.RESOLVED)
+                            .assignedUnit(saved.getAssignedUnit())
+                            .changedAt(LocalDateTime.now())
+                            .build());
+            log.info("Published incident.resolved for incidentId={}", saved.getId());
+        }
+
+        return toResponse(saved);
     }
 
     /** PUT /incidents/:id/assign – manual override */
     @Transactional
     public IncidentResponse assignResponder(UUID id, AssignResponderRequest request) {
         Incident incident = findOrThrow(id);
+        IncidentStatus previousStatus = incident.getStatus();
 
         Responder responder = responderRepository.findById(request.getResponderId())
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -216,10 +255,60 @@ public class IncidentService {
         incident.setAssignedUnit(responder.getId());
         incident.setStatus(IncidentStatus.DISPATCHED);
 
-        return toResponse(incidentRepository.save(incident));
+        Incident saved = incidentRepository.save(incident);
+
+        // Publish incident.dispatched
+        publishStatusChangedEvent(saved, previousStatus, IncidentStatus.DISPATCHED);
+
+        return toResponse(saved);
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────────
+
+    private void publishCreatedEvent(Incident incident) {
+        try {
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.EXCHANGE,
+                    RabbitMQConfig.RK_INCIDENT_CREATED,
+                    IncidentCreatedEvent.builder()
+                            .incidentId(incident.getId())
+                            .incidentType(incident.getIncidentType())
+                            .severity(incident.getSeverity())
+                            .latitude(incident.getLatitude())
+                            .longitude(incident.getLongitude())
+                            .createdBy(incident.getCreatedBy())
+                            .createdAt(incident.getCreatedAt())
+                            .build());
+            log.info("Published incident.created for incidentId={}", incident.getId());
+        } catch (Exception e) {
+            log.error("Failed to publish incident.created for incidentId={}: {}",
+                      incident.getId(), e.getMessage());
+        }
+    }
+
+    private void publishStatusChangedEvent(Incident incident,
+                                            IncidentStatus previousStatus,
+                                            IncidentStatus newStatus) {
+        try {
+            String routingKey = RabbitMQConfig.RK_INCIDENT_STATUS_PREFIX + newStatus.name();
+            // Also use the dedicated dispatched key
+            if (newStatus == IncidentStatus.DISPATCHED) {
+                routingKey = RabbitMQConfig.RK_INCIDENT_DISPATCHED;
+            }
+            IncidentStatusChangedEvent event = IncidentStatusChangedEvent.builder()
+                    .incidentId(incident.getId())
+                    .previousStatus(previousStatus)
+                    .newStatus(newStatus)
+                    .assignedUnit(incident.getAssignedUnit())
+                    .changedAt(LocalDateTime.now())
+                    .build();
+            rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, routingKey, event);
+            log.info("Published {} for incidentId={}", routingKey, incident.getId());
+        } catch (Exception e) {
+            log.error("Failed to publish status event for incidentId={}: {}",
+                      incident.getId(), e.getMessage());
+        }
+    }
 
     private Incident findOrThrow(UUID id) {
         return incidentRepository.findById(id)
