@@ -1,141 +1,188 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { trackingApi } from '../api';
-import { PageHeader, Card, Btn, DataTable, VehicleStatusBadge, Modal, Field, Input, Select, SectionTitle } from '../components/UI';
-import { VEHICLE_TYPES, STATION_TYPES, fmtDateTime } from '../utils/constants';
+import { PageHeader, Card, DataTable, SectionTitle, Btn, VehicleStatusBadge, Modal, Field, Input, Select, VehicleIcon, Spinner } from '../components/UI';
+import { VEHICLE_TYPES, VEHICLE_STATUSES, VEHICLE_STATUS_COLORS, STATION_TYPES, ROLE_STATION } from '../utils/constants';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
-const MOCK = [
-  { id:'v1', registration:'GR-1234-22', vehicleType:'AMBULANCE',   status:'EN_ROUTE',   currentLat:5.6037, currentLng:-0.1870, stationType:'HOSPITAL',        stationId:'st-001', activeIncidentId:'inc-001', updatedAt: new Date(Date.now()-3*60000).toISOString() },
-  { id:'v2', registration:'GR-5678-22', vehicleType:'POLICE_CAR',  status:'ON_SCENE',   currentLat:5.5502, currentLng:-0.2174, stationType:'POLICE_STATION',  stationId:'st-002', activeIncidentId:'inc-002', updatedAt: new Date(Date.now()-7*60000).toISOString() },
-  { id:'v3', registration:'GR-9012-22', vehicleType:'FIRE_TRUCK',  status:'IDLE',       currentLat:5.5480, currentLng:-0.2190, stationType:'FIRE_STATION',    stationId:'st-003', activeIncidentId:null,      updatedAt: new Date(Date.now()-15*60000).toISOString() },
-  { id:'v4', registration:'GR-3456-22', vehicleType:'AMBULANCE',   status:'IDLE',       currentLat:6.6885, currentLng:1.6244,  stationType:'HOSPITAL',        stationId:'st-004', activeIncidentId:null,      updatedAt: new Date(Date.now()-20*60000).toISOString() },
-  { id:'v5', registration:'GR-7890-22', vehicleType:'PATROL_BIKE', status:'RETURNING',  currentLat:4.8989, currentLng:-1.7577, stationType:'POLICE_STATION',  stationId:'st-005', activeIncidentId:null,      updatedAt: new Date(Date.now()-5*60000).toISOString() },
-  { id:'v6', registration:'GR-2345-22', vehicleType:'POLICE_CAR',  status:'IDLE',       currentLat:5.6698, currentLng:-0.0166, stationType:'POLICE_STATION',  stationId:'st-006', activeIncidentId:null,      updatedAt: new Date(Date.now()-30*60000).toISOString() },
-  { id:'v7', registration:'AS-1111-23', vehicleType:'FIRE_TRUCK',  status:'DISPATCHED', currentLat:6.6870, currentLng:1.6230,  stationType:'FIRE_STATION',    stationId:'st-007', activeIncidentId:'inc-003',  updatedAt: new Date(Date.now()-2*60000).toISOString() },
-  { id:'v8', registration:'KS-4567-23', vehicleType:'AMBULANCE',   status:'IDLE',       currentLat:6.6900, currentLng:1.6200,  stationType:'HOSPITAL',        stationId:'st-008', activeIncidentId:null,      updatedAt: new Date(Date.now()-45*60000).toISOString() },
-];
+
+
+
+
 
 export default function Vehicles() {
-  const [vehicles, setVehicles] = useState(MOCK);
-  const [loading] = useState(false);
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ registration:'', vehicleType:'', stationId:'', stationType:'' });
-  const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth();
+  const stationFilter = ROLE_STATION[user?.role];
+  const [vehicles, setVehicles] = useState([]);
+  const [loading, setLoading]   = useState(true);
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ registration: '', vehicleType: '', stationType: '', latitude: '', longitude: '' });
 
-  useEffect(() => {
-    trackingApi.listVehicles().then(r=>{ if(r.data?.length) setVehicles(r.data); }).catch(()=>{});
-  }, []);
+  const load = useCallback(() => {
+    setLoading(true);
+    trackingApi.listVehicles()
+      .then(r => {
+        const all = r.data || [];
+        setVehicles(stationFilter ? all.filter(v => v.stationType === stationFilter) : all);
+      })
+      .catch(() => toast.error('Failed to load vehicles'))
+      .finally(() => setLoading(false));
+  }, [stationFilter]);
 
-  const filtered = vehicles.filter(v => {
-    if (filterType && v.vehicleType !== filterType) return false;
-    if (filterStatus && v.status !== filterStatus) return false;
-    return true;
-  });
+  useEffect(() => { load(); }, [load]);
 
-  const validate = () => {
-    const e = {};
-    if (!form.registration.trim()) e.registration = 'Required';
-    if (!form.vehicleType) e.vehicleType = 'Required';
-    if (!form.stationId.trim()) e.stationId = 'Required';
-    if (!form.stationType) e.stationType = 'Required';
-    return e;
-  };
+
+  const filtered = vehicles.filter(v =>
+    (!filterType || v.vehicleType === filterType) &&
+    (!filterStatus || v.status === filterStatus)
+  );
+
+  const typeCounts = VEHICLE_TYPES.reduce((a, t) => {
+    a[t.value] = vehicles.filter(v => v.vehicleType === t.value).length;
+    return a;
+  }, {});
+  const statusCounts = VEHICLE_STATUSES.reduce((a, s) => {
+    a[s.value] = vehicles.filter(v => v.status === s.value).length;
+    return a;
+  }, {});
 
   const handleRegister = async () => {
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setSubmitting(true);
+    if (!form.registration || !form.vehicleType || !form.stationType) { toast.error('Registration, type, and station are required'); return; }
+    // Enforce XX-0000-00 or X-0000-00 format
+    if (!/^[A-Z]{1,2}-\d{1,4}-\d{2}$/.test(form.registration)) {
+      toast.error('Registration must match format: GR-1234-22');
+      return;
+    }
+    setSaving(true);
     try {
-      await trackingApi.registerVehicle({ registration:form.registration.toUpperCase(), vehicleType:form.vehicleType, stationId:form.stationId, stationType:form.stationType });
+      await trackingApi.registerVehicle({
+        registration: form.registration, vehicleType: form.vehicleType,
+        stationType: form.stationType,
+        latitude: parseFloat(form.latitude) || 5.55,
+        longitude: parseFloat(form.longitude) || -0.21,
+      });
       toast.success('Vehicle registered');
-      setModal(false);
-      setForm({ registration:'', vehicleType:'', stationId:'', stationType:'' });
+      setModalOpen(false);
+      setForm({ registration:'', vehicleType:'', stationType:'', latitude:'', longitude:'' });
+      trackingApi.listVehicles().then(r => { if (r.data?.length) setVehicles(r.data); }).catch(() => {});
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed — backend not connected (preview mode)');
-    } finally { setSubmitting(false); }
+      toast.error(err.response?.data?.message || 'Registration failed');
+    } finally { setSaving(false); }
   };
 
-  const byType = VEHICLE_TYPES.map(t => ({ ...t, count: vehicles.filter(v=>v.vehicleType===t.value).length }));
-  const active = vehicles.filter(v=>v.status!=='IDLE').length;
+  const selStyle = {
+    background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-sm)',
+    padding: '8px 12px', color: 'var(--text-secondary)', fontSize: 12, outline: 'none', cursor: 'pointer',
+    appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%237A93BF' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', paddingRight: 30,
+  };
 
   const cols = [
-    { key:'vehicleType', label:'Type', w:60, render:(v) => <div style={{ display:'flex', alignItems:'center', gap:8 }}><span style={{ fontSize:20 }}>{VEHICLE_TYPES.find(t=>t.value===v)?.icon||'🚗'}</span><span style={{ fontSize:12, color:'var(--text-secondary)' }}>{v?.replace('_',' ')}</span></div> },
-    { key:'registration', label:'Registration', render:(v) => <span style={{ fontFamily:'var(--font-mono)', fontWeight:700, fontSize:13, color:'var(--amber)', letterSpacing:'0.05em' }}>{v}</span> },
-    { key:'status', label:'Status', w:130, render:(v) => <VehicleStatusBadge status={v} /> },
-    { key:'stationType', label:'Station', w:160, render:(v) => <span style={{ fontSize:12, color:'var(--text-secondary)' }}>{v?.replace('_',' ')}</span> },
-    { key:'currentLat', label:'GPS Location', w:180, render:(v,row) => v ? <span style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-muted)' }}>{v?.toFixed(4)}, {row.currentLng?.toFixed(4)}</span> : <span style={{ color:'var(--text-muted)', fontSize:12 }}>No GPS</span> },
-    { key:'activeIncidentId', label:'Incident', w:120, render:(v) => v ? <span style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'var(--cyan)' }}>{v.slice(0,10)}...</span> : <span style={{ color:'var(--text-muted)', fontSize:12 }}>—</span> },
-    { key:'updatedAt', label:'Updated', w:140, render:(v) => <span style={{ fontSize:11, color:'var(--text-muted)' }}>{fmtDateTime(v)}</span> },
+    { key:'vehicleType',  label:'Type', w:60, render: v => <VehicleIcon type={v} size={18} /> },
+    { key:'registration', label:'Registration',        render: (v) => <span style={{ fontFamily:'var(--font-mono)', fontWeight:600, fontSize:13 }}>{v}</span> },
+    { key:'vehicleType',  label:'Class',         w:140, sortable:false, render: v => <span style={{ fontSize:12,color:'var(--text-secondary)' }}>{v?.replace('_',' ')}</span> },
+    { key:'stationType',  label:'Station',       w:160, render: v => <span style={{ fontSize:12, color:'var(--text-secondary)' }}>{v?.replace('_', ' ')}</span> },
+    { key:'status',       label:'Status',        w:130, render: v => <VehicleStatusBadge status={v} /> },
+    { key:'currentLat',   label:'GPS',           w:170, sortable:false, render:(v, r) => (
+      <span style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-muted)' }}>
+        {v?.toFixed(4) || '—'}, {r.currentLng?.toFixed(4) || '—'}
+      </span>
+    )},
   ];
-
-  const tagBtn = (label, active_, onClick) => (
-    <button onClick={onClick} style={{ padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:600, border:'1px solid', borderColor:active_?'var(--amber)':'var(--border-subtle)', background:active_?'var(--amber-soft)':'transparent', color:active_?'var(--amber)':'var(--text-secondary)', cursor:'pointer', transition:'all var(--ease-fast)' }}>{label}</button>
-  );
 
   return (
     <div style={{ animation:'fadeUp 0.3s ease' }}>
-      <PageHeader title="Fleet Management" subtitle={`${vehicles.length} registered vehicles · ${active} active`}
-        actions={<Btn onClick={()=>setModal(true)} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>}>Register Vehicle</Btn>}
+      <PageHeader
+        title="Fleet Management"
+        subtitle={`${vehicles.length} registered vehicles`}
+        actions={<Btn onClick={() => setModalOpen(true)} icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>}>Register Vehicle</Btn>}
       />
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:14, marginBottom:20 }}>
-        {byType.map(t => (
-          <Card key={t.value} style={{ padding:'16px 20px', cursor:'pointer', transition:'all var(--ease-fast)', borderColor:filterType===t.value?'var(--amber-border)':'var(--border-subtle)' }} onClick={()=>setFilterType(filterType===t.value?'':t.value)}>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ fontSize:24 }}>{t.icon}</span>
-              <div>
-                <div style={{ fontFamily:'var(--font-display)', fontSize:24, fontWeight:800, color:'var(--amber)', lineHeight:1 }}>{t.count}</div>
-                <div style={{ fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em', marginTop:2 }}>{t.label}</div>
-              </div>
-            </div>
+      {/* Summary cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px,1fr))', gap:14, marginBottom:22 }}>
+        {VEHICLE_TYPES.map(t => (
+          <Card key={t.value} style={{ padding:'16px 18px', cursor:'pointer' }}
+            onClick={() => setFilterType(filterType === t.value ? '' : t.value)}
+            glowColor={filterType === t.value ? 'var(--color-brand)' : undefined}
+          >
+            <div style={{ fontSize:28, marginBottom:8 }}>{t.icon}</div>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:24, fontWeight:800, color:'var(--color-brand)' }}>{typeCounts[t.value] || 0}</div>
+            <div style={{ fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em', marginTop:3 }}>{t.label}</div>
+            {filterType === t.value && <div style={{ position:'absolute', bottom:0, left:0, right:0, height:2, background:'var(--color-brand)' }} />}
           </Card>
         ))}
       </div>
 
-      <Card style={{ marginBottom:16, padding:'14px 18px' }}>
-        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-          <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.1em' }}>Filter:</span>
-          {VEHICLE_TYPES.map(t => tagBtn(`${t.icon} ${t.label}`, filterType===t.value, ()=>setFilterType(filterType===t.value?'':t.value)))}
-          <div style={{ width:1, height:20, background:'var(--border-subtle)' }} />
-          {['IDLE','EN_ROUTE','ON_SCENE','RETURNING','DISPATCHED'].map(s => tagBtn(s.replace('_',' '), filterStatus===s, ()=>setFilterStatus(filterStatus===s?'':s)))}
-          {(filterType||filterStatus) && <Btn variant="ghost" size="sm" onClick={()=>{setFilterType('');setFilterStatus('');}}>Clear</Btn>}
-        </div>
+      {/* Status summary strip */}
+      <Card style={{ padding:'12px 20px', marginBottom:20, display:'flex', gap:0, flexWrap:'wrap', overflowX:'auto' }}>
+        {VEHICLE_STATUSES.map((s, i) => {
+          const color = VEHICLE_STATUS_COLORS[s.value] || 'var(--text-muted)';
+          const isActive = filterStatus === s.value;
+          return (
+            <div key={s.value} style={{ display:'flex', alignItems:'center', flex:1, minWidth:100 }}>
+              {i > 0 && <div style={{ width:1, height:40, background:'var(--border-faint)', flexShrink:0 }} />}
+              <button onClick={() => setFilterStatus(filterStatus === s.value ? '' : s.value)}
+                style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'8px 16px', cursor:'pointer', background:isActive ? `color-mix(in srgb, ${color} 10%, transparent)` : 'transparent', border:'none', borderRadius:'var(--r-sm)', width:'100%' }}>
+                <span style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:800, color: statusCounts[s.value] ? color : 'var(--text-muted)' }}>{statusCounts[s.value] || 0}</span>
+                <span style={{ fontSize:9, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em' }}>{s.label}</span>
+              </button>
+            </div>
+          );
+        })}
       </Card>
+
+      {/* Filter bar */}
+      <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={selStyle}>
+          <option value="">All Types</option>
+          {VEHICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selStyle}>
+          <option value="">All Statuses</option>
+          {VEHICLE_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        {(filterType || filterStatus) && (
+          <Btn variant="ghost" size="sm" onClick={() => { setFilterType(''); setFilterStatus(''); }}>Clear Filters</Btn>
+        )}
+        <div style={{ marginLeft:'auto', fontSize:12, color:'var(--text-muted)', display:'flex', alignItems:'center' }}>{filtered.length} vehicles</div>
+      </div>
 
       <Card style={{ padding:0 }}>
-        <DataTable cols={cols} rows={filtered} loading={loading} emptyTitle="No vehicles registered" emptyIcon="🚗" />
+        <DataTable cols={cols} rows={filtered} emptyTitle="No vehicles found" emptyIcon="🚗" />
       </Card>
 
-      <Modal open={modal} onClose={()=>{setModal(false);setErrors({});}} title="Register New Vehicle">
-        <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
-          <Field label="Registration Number" required error={errors.registration} hint="Vehicle licence plate">
-            <Input value={form.registration} onChange={e=>setForm(f=>({...f,registration:e.target.value.toUpperCase()}))} placeholder="e.g. GR-1234-22" style={{ textTransform:'uppercase', fontFamily:'var(--font-mono)', fontWeight:700 }} />
+      {/* Register modal */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Register New Vehicle" maxWidth={480}>
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <Field label="Registration Plate" required>
+            <Input value={form.registration} onChange={e => setForm(p => ({...p, registration: e.target.value.toUpperCase()}))} placeholder="GR-0000-00" />
           </Field>
-          <Field label="Vehicle Type" required error={errors.vehicleType}>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
-              {VEHICLE_TYPES.map(t => (
-                <button key={t.value} type="button" onClick={()=>{setForm(f=>({...f,vehicleType:t.value}));setErrors(e=>({...e,vehicleType:''}));}}
-                  style={{ padding:'10px', borderRadius:'var(--r-sm)', border:'2px solid', borderColor:form.vehicleType===t.value?'var(--amber)':'var(--border-subtle)', background:form.vehicleType===t.value?'var(--amber-soft)':'var(--bg-raised)', color:form.vehicleType===t.value?'var(--amber)':'var(--text-secondary)', cursor:'pointer', textAlign:'center', transition:'all var(--ease-fast)', fontSize:12, fontWeight:600 }}>
-                  <div style={{ fontSize:22, marginBottom:4 }}>{t.icon}</div>{t.label}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Station Type" required error={errors.stationType}>
-            <Select value={form.stationType} onChange={e=>{setForm(f=>({...f,stationType:e.target.value}));setErrors(er=>({...er,stationType:''}));}}>
-              <option value="">Select station type...</option>
-              {STATION_TYPES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}
+          <Field label="Vehicle Type" required>
+            <Select value={form.vehicleType} onChange={e => setForm(p => ({...p, vehicleType: e.target.value}))}>
+              <option value="">Select type...</option>
+              {VEHICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
             </Select>
           </Field>
-          <Field label="Station ID" required error={errors.stationId} hint="UUID of the owning station">
-            <Input value={form.stationId} onChange={e=>{setForm(f=>({...f,stationId:e.target.value}));setErrors(er=>({...er,stationId:''}));}} placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000" style={{ fontFamily:'var(--font-mono)', fontSize:12 }} />
+          <Field label="Assigned Station" required>
+            <Select value={form.stationType} onChange={e => setForm(p => ({...p, stationType: e.target.value}))}>
+              <option value="">Select station type...</option>
+              {STATION_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </Select>
           </Field>
-          <div style={{ display:'flex', gap:10, justifyContent:'flex-end', paddingTop:8 }}>
-            <Btn variant="secondary" onClick={()=>{setModal(false);setErrors({});}}>Cancel</Btn>
-            <Btn onClick={handleRegister} loading={submitting}>Register Vehicle</Btn>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <Field label="Starting Latitude">
+              <Input type="number" value={form.latitude} onChange={e => setForm(p => ({...p, latitude: e.target.value}))} placeholder="e.g. 5.6037" step="any" />
+            </Field>
+            <Field label="Starting Longitude">
+              <Input type="number" value={form.longitude} onChange={e => setForm(p => ({...p, longitude: e.target.value}))} placeholder="e.g. -0.1870" step="any" />
+            </Field>
+          </div>
+          <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8, borderTop:'1px solid var(--border-faint)', paddingTop:16 }}>
+            <Btn variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Btn>
+            <Btn onClick={handleRegister} loading={saving}>Register</Btn>
           </div>
         </div>
       </Modal>

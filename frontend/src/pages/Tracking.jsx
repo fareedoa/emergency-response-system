@@ -1,27 +1,23 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { trackingApi } from '../api';
-import { PageHeader, Card, SectionTitle } from '../components/UI';
-import { fmtDateTime } from '../utils/constants';
-import { useVehicleSimulation } from '../utils/useVehicleSimulation';
-import VehicleMap from '../components/VehicleMap';
+import { PageHeader, Card, VehicleStatusBadge, SectionTitle } from '../components/UI';
+import { fmtDateTime, VEHICLE_STATUS_COLORS, ROLE_STATION, ROLE_STATION_LABEL } from '../utils/constants';
+import { VehicleIcon } from '../components/UI';
+import { useAuth } from '../context/AuthContext';
+import { useTrackingSocket } from '../hooks/useTrackingSocket';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 
-// ── Initial mock positions (Ghana) ─────────────────────────────────────────
-const MOCK = [
-  { id:'v1', registration:'GR-1234-22', vehicleType:'AMBULANCE',   status:'EN_ROUTE',   currentLat:5.6037,  currentLng:-0.1870,  stationType:'HOSPITAL',       activeIncidentId:'inc-001', updatedAt: new Date(Date.now()-3*60000).toISOString() },
-  { id:'v2', registration:'GR-5678-22', vehicleType:'POLICE_CAR',  status:'ON_SCENE',   currentLat:5.5502,  currentLng:-0.2174,  stationType:'POLICE_STATION', activeIncidentId:'inc-002', updatedAt: new Date(Date.now()-7*60000).toISOString() },
-  { id:'v3', registration:'GR-9012-22', vehicleType:'FIRE_TRUCK',  status:'IDLE',       currentLat:5.5480,  currentLng:-0.2190,  stationType:'FIRE_STATION',   activeIncidentId:null,      updatedAt: new Date(Date.now()-15*60000).toISOString() },
-  { id:'v4', registration:'GR-3456-22', vehicleType:'AMBULANCE',   status:'IDLE',       currentLat:6.6885,  currentLng:1.6244,   stationType:'HOSPITAL',       activeIncidentId:null,      updatedAt: new Date(Date.now()-20*60000).toISOString() },
-  { id:'v5', registration:'GR-7890-22', vehicleType:'PATROL_BIKE', status:'RETURNING',  currentLat:4.8989,  currentLng:-1.7577,  stationType:'POLICE_STATION', activeIncidentId:null,      updatedAt: new Date(Date.now()-5*60000).toISOString() },
-  { id:'v6', registration:'GR-2345-22', vehicleType:'POLICE_CAR',  status:'IDLE',       currentLat:5.6698,  currentLng:-0.0166,  stationType:'POLICE_STATION', activeIncidentId:null,      updatedAt: new Date(Date.now()-30*60000).toISOString() },
-  { id:'v7', registration:'AS-1111-23', vehicleType:'FIRE_TRUCK',  status:'DISPATCHED', currentLat:6.6870,  currentLng:1.6230,   stationType:'FIRE_STATION',   activeIncidentId:'inc-004', updatedAt: new Date(Date.now()-2*60000).toISOString() },
-];
+// Fix default Leaflet icon paths
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
-// ── Visual constants ────────────────────────────────────────────────────────
-const ICONS  = { AMBULANCE:'🚑', POLICE_CAR:'🚓', FIRE_TRUCK:'🚒', PATROL_BIKE:'🏍️' };
-const COLORS = { IDLE:'#10B981', DISPATCHED:'#22D3EE', EN_ROUTE:'#F97316', ON_SCENE:'#EF4444', RETURNING:'#F59E0B' };
-const STATUS_GROUPS = ['IDLE','EN_ROUTE','ON_SCENE','RETURNING','DISPATCHED'];
+const STATUS_GROUPS = ['IDLE', 'EN_ROUTE', 'ON_SCENE', 'RETURNING', 'DISPATCHED'];
 
-// ── Helper: seconds ago label ───────────────────────────────────────────────
 function timeAgo(date) {
   if (!date) return '—';
   const s = Math.round((Date.now() - new Date(date).getTime()) / 1000);
@@ -30,274 +26,246 @@ function timeAgo(date) {
   return `${Math.round(s/60)}m ago`;
 }
 
-// ── StatusPill for filter bar ───────────────────────────────────────────────
-function StatusPill({ label, color, count, active, onClick }) {
-  return (
-    <button onClick={onClick} style={{
-      display:'flex', alignItems:'center', gap:8,
-      background: active ? `${color}18` : 'transparent',
-      border: 'none', cursor:'pointer', padding:'7px 12px',
-      borderRadius:'var(--r-sm)',
-      outline: active ? `1px solid ${color}35` : 'none',
-      transition:'all var(--ease-fast)',
-    }}>
-      <span style={{
-        width:8, height:8, borderRadius:'50%',
-        background: count > 0 ? color : 'var(--border-normal)',
-        animation: (['EN_ROUTE','ON_SCENE'].includes(label) && count > 0) ? 'pulse 2s ease-in-out infinite' : 'none',
-        flexShrink:0,
-      }} />
-      <span style={{
-        fontFamily:'var(--font-mono)', fontSize:11,
-        color: count > 0 ? color : 'var(--text-muted)',
-        whiteSpace:'nowrap',
-      }}>{count} {label.replace('_',' ')}</span>
-    </button>
-  );
+// Build a coloured circle div-icon for each vehicle
+function makeVehicleIcon(color, isSelected, vehicleType) {
+  const size = isSelected ? 44 : 34;
+  const emoji = { AMBULANCE:'🚑', FIRE_TRUCK:'🚒', POLICE_CAR:'🚓' }[vehicleType] || '🚗';
+  return L.divIcon({
+    className: '',
+    iconSize:   [size, size],
+    iconAnchor: [size/2, size/2],
+    html: `<div style="
+      width:${size}px; height:${size}px; border-radius:50%;
+      background:color-mix(in srgb, ${color} 88%, #0e1527);
+      border:${isSelected ? 3 : 2}px solid ${isSelected ? '#fff' : color};
+      box-shadow:0 0 ${isSelected ? 22 : 10}px ${color}88;
+      display:flex; align-items:center; justify-content:center;
+      font-size:${isSelected ? 20 : 15}px;
+      transition:all 0.2s;
+      animation:${['EN_ROUTE','ON_SCENE'].includes(vehicleType) ? 'pulse 2s ease-in-out infinite' : 'none'};
+    ">${emoji}</div>`,
+  });
 }
 
-// ── Vehicle list row ────────────────────────────────────────────────────────
-function VehicleRow({ v, isSelected, onClick, onLocate }) {
-  const color = COLORS[v.status] || 'var(--text-secondary)';
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        display:'flex', alignItems:'center', gap:11, padding:'11px 16px',
-        cursor:'pointer', transition:'background var(--ease-fast)',
-        background: isSelected ? 'var(--bg-hover)' : 'transparent',
-        borderBottom:'1px solid var(--border-faint)',
-        borderLeft: isSelected ? `3px solid ${color}` : '3px solid transparent',
-      }}
-      onMouseEnter={e => { if(!isSelected) e.currentTarget.style.background='var(--bg-raised)'; }}
-      onMouseLeave={e => { if(!isSelected) e.currentTarget.style.background='transparent'; }}
-    >
-      <span style={{ fontSize:22, flexShrink:0 }}>{ICONS[v.vehicleType]||'🚗'}</span>
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:13, fontWeight:700, fontFamily:'var(--font-mono)', color:'var(--text-primary)', marginBottom:1 }}>
-          {v.registration}
-        </div>
-        <div style={{ fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>
-          {v.vehicleType?.replace('_',' ')}
-        </div>
-        <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', marginTop:1 }}>
-          {v.currentLat?.toFixed(4)}, {v.currentLng?.toFixed(4)}
-        </div>
-      </div>
-      <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5 }}>
-        <div style={{
-          fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:10,
-          color, background:`${color}15`, border:`1px solid ${color}28`,
-          textTransform:'uppercase', letterSpacing:'0.08em', whiteSpace:'nowrap',
-        }}>{v.status.replace('_',' ')}</div>
-        {v.activeIncidentId && (
-          <div style={{ fontSize:9, color:'var(--text-muted)', fontFamily:'var(--font-mono)' }}>
-            INC·{v.activeIncidentId.slice(0,6)}
-          </div>
-        )}
-      </div>
-      {/* Locate button */}
-      <button
-        onClick={e => { e.stopPropagation(); onLocate(v); }}
-        title="Locate on map"
-        style={{
-          marginLeft:4, width:28, height:28, borderRadius:'var(--r-sm)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          background:'transparent', border:'1px solid var(--border-faint)',
-          color:'var(--text-muted)', cursor:'pointer',
-          transition:'all var(--ease-fast)', flexShrink:0,
-        }}
-        onMouseEnter={e => { e.currentTarget.style.background='var(--bg-raised)'; e.currentTarget.style.color=color; e.currentTarget.style.borderColor=`${color}40`; }}
-        onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.borderColor='var(--border-faint)'; }}
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-        </svg>
-      </button>
-    </div>
-  );
+// Sub-component that flies the map to a vehicle position
+function MapFlyTo({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) map.flyTo(position, 13, { duration: 1.2 });
+  }, [position, map]);
+  return null;
 }
 
-// ── Page ────────────────────────────────────────────────────────────────────
 export default function Tracking() {
-  const { vehicles, isLive, lastRefreshed } = useVehicleSimulation(MOCK, trackingApi.listVehicles);
-  const [selectedId,  setSelectedId]  = useState(null);
-  const [filter,      setFilter]      = useState('ALL');
-  const [flyTarget,   setFlyTarget]   = useState(null);
-  const [resetCount,  setResetCount]  = useState(0);
+  const { user } = useAuth();
+  const stationFilter = ROLE_STATION[user?.role];
+  const [vehicles, setVehicles]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [selectedId, setSelectedId] = useState(null);
+  const [filter, setFilter]         = useState('ALL');
 
-  const selected  = vehicles.find(v => v.id === selectedId);
-  const filtered  = vehicles.filter(v => filter === 'ALL' || v.status === filter);
+  const load = useCallback(() => {
+    setLoading(true);
+    trackingApi.listVehicles()
+      .then(r => {
+        const all = r.data || [];
+        setVehicles(stationFilter ? all.filter(v => v.stationType === stationFilter) : all);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [stationFilter]);
 
-  const handleSelect = useCallback((id) => setSelectedId(id), []);
+  useEffect(() => { load(); }, [load]);
 
-  const handleLocate = useCallback((v) => {
-    setSelectedId(v.id);
-    setFlyTarget({ lat: v.currentLat, lng: v.currentLng, _ts: Date.now() });
-  }, []);
+  // Poll every 15s as fallback
+  useEffect(() => {
+    const id = setInterval(() => load(), 15000);
+    return () => clearInterval(id);
+  }, [load]);
 
-  const handleReset = useCallback(() => {
-    setSelectedId(null);
-    setResetCount(c => c + 1);
-  }, []);
+  // WebSocket: patch vehicles in-place on location update
+  useTrackingSocket((update) => {
+    setVehicles(prev => prev.map(v =>
+      (v.id === update.vehicleId)
+        ? { ...v, currentLat: update.latitude, currentLng: update.longitude, status: update.status || v.status, updatedAt: update.updatedAt }
+        : v
+    ));
+  });
 
-  const color = selected ? COLORS[selected.status] : 'var(--amber)';
+  const filtered = vehicles.filter(v => filter === 'ALL' || v.status === filter);
+  const selected = vehicles.find(v => v.id === selectedId);
+  const flyTarget = selected?.currentLat ? [selected.currentLat, selected.currentLng] : null;
 
   return (
-    <div style={{ animation:'fadeUp 0.3s ease', display:'flex', flexDirection:'column', gap:20 }}>
+    <div style={{ animation: 'fadeUp 0.3s ease' }}>
+      <PageHeader title="Live Tracking" subtitle="Real-time vehicle position monitoring — updates every 10 seconds" />
 
-      {/* ── Header ── */}
-      <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
-        <div>
-          <h1 style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, color:'var(--text-primary)', letterSpacing:'-0.01em' }}>
-            Live Tracking
-          </h1>
-          <p style={{ fontSize:13, color:'var(--text-secondary)', marginTop:5 }}>
-            Real-time vehicle position monitoring via OpenStreetMap
-          </p>
-        </div>
-        {/* Live status pill */}
-        <div style={{
-          display:'flex', alignItems:'center', gap:8, padding:'8px 16px',
-          background: isLive ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-          border: `1px solid ${isLive ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
-          borderRadius:'var(--r-sm)',
-        }}>
-          <span style={{
-            width:7, height:7, borderRadius:'50%',
-            background: isLive ? '#10B981' : '#F59E0B',
-            animation: 'pulse 2s ease-in-out infinite',
-          }} />
-          <span style={{ fontSize:11, fontWeight:700, fontFamily:'var(--font-mono)', color: isLive ? '#10B981' : '#F59E0B', textTransform:'uppercase', letterSpacing:'0.1em' }}>
-            {isLive ? 'Live' : 'Simulated'}
-          </span>
-          {lastRefreshed && (
-            <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)' }}>
-              · refreshed {timeAgo(lastRefreshed)}
+      {/* Status filter pills */}
+      <Card style={{ marginBottom: 20, padding: '12px 20px' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={() => setFilter('ALL')}
+            style={{ padding: '5px 14px', borderRadius: 'var(--r-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', borderColor: filter === 'ALL' ? 'var(--border-normal)' : 'transparent', background: filter === 'ALL' ? 'var(--bg-raised)' : 'transparent', color: filter === 'ALL' ? 'var(--text-primary)' : 'var(--text-muted)' }}
+          >
+            ALL · {vehicles.length}
+          </button>
+          {STATUS_GROUPS.map(s => {
+            const count = vehicles.filter(v => v.status === s).length;
+            const color = VEHICLE_STATUS_COLORS[s] || 'var(--text-muted)';
+            const isActive = filter === s;
+            return (
+              <button key={s} onClick={() => setFilter(filter === s ? 'ALL' : s)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--r-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', border: '1px solid', borderColor: isActive ? color : 'transparent', background: isActive ? `color-mix(in srgb, ${color} 14%, transparent)` : 'transparent', color: count > 0 ? color : 'var(--text-muted)' }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: count > 0 ? color : 'var(--border-normal)', animation: (['EN_ROUTE','ON_SCENE'].includes(s) && count > 0) ? 'pulse 1.8s ease-in-out infinite' : 'none' }} />
+                {s.replace('_', ' ')} · {count}
+              </button>
+            );
+          })}
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Role scope badge */}
+            <span style={{
+              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.07em',
+              padding: '3px 10px', borderRadius: 'var(--r-full)',
+              background: stationFilter ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)' : 'color-mix(in srgb, var(--color-brand) 12%, transparent)',
+              color: stationFilter ? 'var(--color-warning)' : 'var(--color-brand)',
+              border: `1px solid ${stationFilter ? 'color-mix(in srgb, var(--color-warning) 30%, transparent)' : 'color-mix(in srgb, var(--color-brand) 30%, transparent)'}`,
+            }}>
+              🏗️ {ROLE_STATION_LABEL[user?.role] || 'All Stations'}
             </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Status filter bar ── */}
-      <Card style={{ padding:'12px 20px' }}>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-          {STATUS_GROUPS.map(s => (
-            <StatusPill key={s} label={s} color={COLORS[s]||'#888'}
-              count={vehicles.filter(v => v.status===s).length}
-              active={filter===s}
-              onClick={() => setFilter(filter===s?'ALL':s)}
-            />
-          ))}
-          <span style={{ marginLeft:'auto', fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-mono)' }}>
-            {vehicles.length} vehicles total
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{vehicles.length} vehicles</span>
           </span>
         </div>
       </Card>
 
-      {/* ── Main grid: list + map ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'310px 1fr', gap:20, alignItems:'start' }}>
-
-        {/* ── Left panel: vehicle list ── */}
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-
-          {/* Fleet list */}
-          <Card style={{ padding:0 }}>
-            <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--border-faint)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <div>
-                <SectionTitle>Fleet Vehicles</SectionTitle>
-                <p style={{ fontSize:10, color:'var(--text-muted)', marginTop:-12 }}>{filtered.length} shown</p>
-              </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
+        {/* Vehicle list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <Card style={{ padding: 0 }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-faint)' }}>
+              <SectionTitle>Fleet Vehicles</SectionTitle>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -12 }}>{filtered.length} shown</p>
             </div>
-            <div style={{ maxHeight:420, overflowY:'auto' }}>
-              {filtered.map(v => (
-                <VehicleRow
-                  key={v.id} v={v}
-                  isSelected={v.id===selectedId}
-                  onClick={() => setSelectedId(v.id===selectedId ? null : v.id)}
-                  onLocate={handleLocate}
-                />
-              ))}
-            </div>
+            {loading && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>Loading vehicles…</div>
+            )}
+            {!loading && filtered.length === 0 && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>No vehicles match the current filter.</div>
+            )}
+            {filtered.map(v => {
+              const color = VEHICLE_STATUS_COLORS[v.status] || 'var(--text-secondary)';
+              const isSel = v.id === selectedId;
+              const isLive = v.status === 'EN_ROUTE' || v.status === 'ON_SCENE';
+              return (
+                <div
+                  key={v.id}
+                  onClick={() => setSelectedId(isSel ? null : v.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 18px', cursor: 'pointer', background: isSel ? 'var(--bg-hover)' : 'transparent', borderBottom: '1px solid var(--border-faint)', borderLeft: isSel ? `3px solid ${color}` : '3px solid transparent', transition: 'all var(--ease-fast)' }}
+                  onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'var(--bg-raised)'; }}
+                  onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ flexShrink: 0, fontSize: 22 }}><VehicleIcon type={v.vehicleType} size={22} /></span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 2 }}>{v.registration}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{v.vehicleType?.replace('_', ' ')}</div>
+                    {v.currentLat && (
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{v.currentLat?.toFixed(4)}, {v.currentLng?.toFixed(4)}</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {isLive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, animation: 'pulse 1.5s ease-in-out infinite' }} />}
+                      <span style={{ fontSize: 9, fontWeight: 700, color, background: `color-mix(in srgb, ${color} 13%, transparent)`, padding: '2px 7px', borderRadius: 'var(--r-full)', textTransform: 'uppercase', letterSpacing: '0.08em', border: `1px solid color-mix(in srgb, ${color} 28%, transparent)` }}>{v.status}</span>
+                    </div>
+                    {v.activeIncidentId && <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>INC·{v.activeIncidentId.slice(0, 7)}</div>}
+                  </div>
+                </div>
+              );
+            })}
           </Card>
 
-          {/* Selected vehicle detail card */}
+          {/* Vehicle detail panel */}
           {selected && (
-            <Card glowColor={color} style={{ padding:'16px' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-                <SectionTitle>Vehicle Detail</SectionTitle>
-                <button onClick={() => handleLocate(selected)}
-                  style={{ fontSize:11, color:color, background:`${color}15`, border:`1px solid ${color}30`, borderRadius:'var(--r-sm)', padding:'4px 10px', cursor:'pointer', fontFamily:'var(--font-mono)', fontWeight:700 }}>
-                  ⊕ Focus
-                </button>
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+            <Card glowColor={VEHICLE_STATUS_COLORS[selected.status]}>
+              <SectionTitle>Vehicle Detail</SectionTitle>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                 {[
                   ['Registration', selected.registration],
-                  ['Type',         selected.vehicleType?.replace('_',' ')],
-                  ['Station',      selected.stationType?.replace('_',' ')],
-                  ['Status',       selected.status.replace('_',' ')],
-                  ['GPS Lat',      selected.currentLat?.toFixed(6)],
-                  ['GPS Lng',      selected.currentLng?.toFixed(6)],
-                  ['Last Update',  fmtDateTime(selected.updatedAt)],
-                  ['Active Inc.',  selected.activeIncidentId||'—'],
-                ].map(([k, val]) => (
-                  <div key={k} style={{ display:'flex', justifyContent:'space-between', gap:12, fontSize:12, borderBottom:'1px solid var(--border-faint)', paddingBottom:7 }}>
-                    <span style={{ color:'var(--text-muted)' }}>{k}</span>
-                    <span style={{ color:'var(--text-primary)', fontWeight:500, fontFamily:'var(--font-mono)', textAlign:'right', wordBreak:'break-all' }}>{val}</span>
+                  ['Type', selected.vehicleType?.replace('_', ' ')],
+                  ['Station', selected.stationType?.replace('_', ' ')],
+                  ['GPS Lat', selected.currentLat?.toFixed(6)],
+                  ['GPS Lng', selected.currentLng?.toFixed(6)],
+                  ['Updated', timeAgo(selected.updatedAt)],
+                  ['Last Seen', fmtDateTime(selected.updatedAt)],
+                  ['Active Incident', selected.activeIncidentId || '—'],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, borderBottom: '1px solid var(--border-faint)', paddingBottom: 8 }}>
+                    <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{k}</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'var(--font-mono)', textAlign: 'right', wordBreak: 'break-all', fontSize: 11 }}>{v}</span>
                   </div>
                 ))}
+              </div>
+              <div style={{ marginTop: 14 }}>
+                <VehicleStatusBadge status={selected.status} />
               </div>
             </Card>
           )}
         </div>
 
-        {/* ── Right panel: Leaflet OSM map ── */}
-        <Card style={{ padding:0, overflow:'hidden' }}>
-          {/* Map header */}
-          <div style={{ padding:'13px 18px', borderBottom:'1px solid var(--border-faint)', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
+        {/* Map panel */}
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-faint)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-display)', display:'flex', alignItems:'center', gap:8 }}>
-                🗺 Live Map
-                <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:10, background:'rgba(34,211,238,0.12)', color:'#22D3EE', border:'1px solid rgba(34,211,238,0.2)', letterSpacing:'0.06em', fontFamily:'var(--font-mono)' }}>
-                  OpenStreetMap
-                </span>
-              </div>
-              <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:3 }}>
-                {vehicles.filter(v=>v.currentLat).length} vehicles with GPS · updates every 3s
-              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-display)' }}>Live Map</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{vehicles.filter(v => v.currentLat).length} vehicles with GPS signal</div>
             </div>
-            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              {/* Legend */}
-              <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-                {[['#10B981','Idle'],['#F97316','En Route'],['#EF4444','On Scene'],['#22D3EE','Dispatched'],['#F59E0B','Returning']].map(([c,l])=>(
-                  <div key={l} style={{ display:'flex', alignItems:'center', gap:5, fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)' }}>
-                    <span style={{ width:8, height:8, borderRadius:'50%', background:c, display:'inline-block', flexShrink:0 }} />
-                    {l}
-                  </div>
-                ))}
-              </div>
-              {/* Reset button */}
-              <button onClick={handleReset}
-                style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 12px', fontSize:11, fontFamily:'var(--font-mono)', fontWeight:600, borderRadius:'var(--r-sm)', background:'var(--bg-raised)', border:'1px solid var(--border-normal)', color:'var(--text-secondary)', cursor:'pointer', whiteSpace:'nowrap', transition:'all var(--ease-fast)' }}
-                onMouseEnter={e => { e.currentTarget.style.background='var(--bg-hover)'; e.currentTarget.style.color='var(--amber)'; e.currentTarget.style.borderColor='var(--amber-border)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background='var(--bg-raised)'; e.currentTarget.style.color='var(--text-secondary)'; e.currentTarget.style.borderColor='var(--border-normal)'; }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                Reset View
-              </button>
+            <div style={{ display: 'flex', gap: 14, fontSize: 10, fontFamily: 'var(--font-mono)' }}>
+              {[['var(--color-warning)','En Route'],['var(--color-danger)','On Scene'],['var(--color-success)','Idle'],['var(--color-dispatch)','Dispatched']].map(([c, l]) => (
+                <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-muted)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                  <span>{l}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* The actual map */}
-          <div style={{ height:560 }}>
-            <VehicleMap
-              vehicles={vehicles}
-              selectedId={selectedId}
-              onSelect={handleSelect}
-              flyTarget={flyTarget}
-              resetTrigger={resetCount}
-            />
+          {/* OSM Map */}
+          <div style={{ height: 520 }}>
+            <MapContainer center={[7.95, -1.02]} zoom={7} style={{ width: '100%', height: '100%' }} attributionControl zoomControl>
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                subdomains="abcd"
+                maxZoom={19}
+                attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+              />
+              {flyTarget && <MapFlyTo position={flyTarget} />}
+              {vehicles.filter(v => v.currentLat).map(v => {
+                const color = VEHICLE_STATUS_COLORS[v.status] || '#888';
+                const isSel = v.id === selectedId;
+                return (
+                  <Marker
+                    key={v.id}
+                    position={[v.currentLat, v.currentLng]}
+                    icon={makeVehicleIcon(color, isSel, v.vehicleType)}
+                    eventHandlers={{ click: () => setSelectedId(v.id === selectedId ? null : v.id) }}
+                  >
+                    <Popup>
+                      <div style={{ fontWeight: 700, color, fontSize: 13, marginBottom: 4 }}>{v.registration}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{v.vehicleType?.replace('_', ' ')}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+                        {v.currentLat?.toFixed(5)}, {v.currentLng?.toFixed(5)}
+                      </div>
+                      <div style={{ marginTop: 6 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, color, background: `color-mix(in srgb, ${color} 15%, transparent)`, padding: '2px 8px', borderRadius: 'var(--r-full)', border: `1px solid ${color}40` }}>{v.status}</span>
+                      </div>
+                      {v.activeIncidentId && (
+                        <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 6 }}>INC · {v.activeIncidentId.slice(0, 8)}</div>
+                      )}
+                    </Popup>
+                  </Marker>
+                );
+              })}
+            </MapContainer>
           </div>
         </Card>
       </div>

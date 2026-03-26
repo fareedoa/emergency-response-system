@@ -1,19 +1,23 @@
 import axios from 'axios';
 
-// ── Service URLs (match application.yaml ports) ──────────────────────────
+// ── Service URLs ──────────────────────────────────────────────────────────
 export const URLS = {
   AUTH:      import.meta.env.VITE_AUTH_URL      || 'http://localhost:8081',
   INCIDENT:  import.meta.env.VITE_INCIDENT_URL  || 'http://localhost:8082',
   TRACKING:  import.meta.env.VITE_TRACKING_URL  || 'http://localhost:8083',
   ANALYTICS: import.meta.env.VITE_ANALYTICS_URL || 'http://localhost:8084',
-  WS:        import.meta.env.VITE_WS_URL         || 'http://localhost:8083',
+  WS:        import.meta.env.VITE_WS_URL         || 'ws://localhost:8083',
 };
 
 // ── Token helpers ─────────────────────────────────────────────────────────
 const getToken   = () => localStorage.getItem('swiftaid_access');
 const getRefresh = () => localStorage.getItem('swiftaid_refresh');
 const setToken   = (t) => localStorage.setItem('swiftaid_access', t);
-export const clearAuth = () => { localStorage.removeItem('swiftaid_access'); localStorage.removeItem('swiftaid_refresh'); localStorage.removeItem('swiftaid_user'); };
+export const clearAuth = () => {
+  localStorage.removeItem('swiftaid_access');
+  localStorage.removeItem('swiftaid_refresh');
+  localStorage.removeItem('swiftaid_user');
+};
 
 // ── Axios factory ─────────────────────────────────────────────────────────
 function makeClient(baseURL) {
@@ -47,58 +51,60 @@ function makeClient(baseURL) {
   return c;
 }
 
-export const authHttp     = makeClient(URLS.AUTH);
-export const incidentHttp = makeClient(URLS.INCIDENT);
-export const trackingHttp = makeClient(URLS.TRACKING);
+export const authHttp      = makeClient(URLS.AUTH);
+export const incidentHttp  = makeClient(URLS.INCIDENT);
+export const trackingHttp  = makeClient(URLS.TRACKING);
 export const analyticsHttp = makeClient(URLS.ANALYTICS);
 
 // ── Auth Service (port 8081) ──────────────────────────────────────────────
 export const authApi = {
-  login:          (email, password)  => authHttp.post('/auth/login', { email, password }),
-  register:       (body)             => authHttp.post('/auth/register', body),
-  logout:         ()                 => authHttp.post('/auth/logout'),
-  refresh:        (refreshToken)     => authHttp.post('/auth/refresh-token', { refreshToken }),
-  profile:        ()                 => authHttp.get('/auth/profile'),
-  updateProfile:  (body)             => authHttp.put('/auth/profile', body),
-  listUsers:      (params)           => authHttp.get('/auth/users', { params }),
-  deactivateUser: (id)               => authHttp.put(`/auth/users/${id}/deactivate`),
+  login:          (email, password) => authHttp.post('/auth/login', { email, password }),
+  register:       (body)            => authHttp.post('/auth/register', body),
+  logout:         ()                => authHttp.post('/auth/logout'),
+  refresh:        (refreshToken)    => authHttp.post('/auth/refresh-token', { refreshToken }),
+  profile:        ()                => authHttp.get('/auth/profile'),
+  updateProfile:  (body)            => authHttp.put('/auth/profile', body),
+  updatePassword: (body)            => authHttp.put('/auth/password', body),
+  // User management (SYSTEM_ADMIN)
+  listUsers:      ()                => authHttp.get('/users'),
+  activateUser:   (id)              => authHttp.patch(`/users/${id}/activate`),
+  deactivateUser: (id)              => authHttp.patch(`/users/${id}/deactivate`),
 };
 
 // ── Incident Service (port 8082) ──────────────────────────────────────────
 export const incidentApi = {
-  create:         (body)   => incidentHttp.post('/incidents', body),
-  list:           ()       => incidentHttp.get('/incidents'),
-  listOpen:       ()       => incidentHttp.get('/incidents/open'),
-  get:            (id)     => incidentHttp.get(`/incidents/${id}`),
-  updateStatus:   (id, status) => incidentHttp.put(`/incidents/${id}/status`, { status }),
-  assign:         (id, responderId) => incidentHttp.put(`/incidents/${id}/assign`, { responderId }),
-  delete:         (id)     => incidentHttp.delete(`/incidents/${id}`),
-  timeline:       (id)     => incidentHttp.get(`/incidents/${id}/timeline`),
-  notes:          (id)     => incidentHttp.get(`/incidents/${id}/notes`),
-  nearestResponder: (id)   => incidentHttp.get(`/incidents/${id}/responders/nearest`),
+  create:           (body)              => incidentHttp.post('/incidents', body),
+  list:             ()                  => incidentHttp.get('/incidents'),
+  listOpen:         ()                  => incidentHttp.get('/incidents/open'),
+  get:              (id)                => incidentHttp.get(`/incidents/${id}`),
+  updateStatus:     (id, status)        => incidentHttp.put(`/incidents/${id}/status`, { status }),
+  assign:           (id, responderId)   => incidentHttp.put(`/incidents/${id}/assign`, { responderId }),
+  delete:           (id)                => incidentHttp.delete(`/incidents/${id}`),
+  timeline:         (id)                => incidentHttp.get(`/incidents/${id}/timeline`),
+  notes:            (id)                => incidentHttp.get(`/incidents/${id}/notes`),
+  nearestResponder: (id)                => incidentHttp.get(`/incidents/${id}/responders/nearest`),
 };
 
 // ── Tracking Service (port 8083) ──────────────────────────────────────────
 export const trackingApi = {
-  registerVehicle:   (body)   => trackingHttp.post('/vehicles/register', body),
-  listVehicles:      ()       => trackingHttp.get('/vehicles'),
-  getVehicle:        (id)     => trackingHttp.get(`/vehicles/${id}`),
-  getLocation:       (id)     => trackingHttp.get(`/vehicles/${id}/location`),
-  updateLocation:    (id, lat, lng) => trackingHttp.put(`/vehicles/${id}/location`, { latitude: lat, longitude: lng }),
-  getHistory:        (id, params)   => trackingHttp.get(`/vehicles/${id}/history`, { params }),
-  updateStatus:      (id, status)   => trackingHttp.put(`/vehicles/${id}/status`, { status }),
-  activeVehicles:    ()       => trackingHttp.get('/tracking/active'),
-  incidentVehicles:  (incidentId)   => trackingHttp.get(`/tracking/incident/${incidentId}`),
+  registerVehicle: (body)             => trackingHttp.post('/vehicles/register', body),
+  listVehicles:    ()                 => trackingHttp.get('/vehicles'),
+  getVehicle:      (id)               => trackingHttp.get(`/vehicles/${id}`),
+  getLocation:     (id)               => trackingHttp.get(`/vehicles/${id}/location`),
+  updateLocation:  (id, lat, lng)     => trackingHttp.put(`/vehicles/${id}/location`, { latitude: lat, longitude: lng }),
+  updateStatus:    (id, status)       => trackingHttp.put(`/vehicles/${id}/status`, { status }),
 };
 
 // ── Analytics Service (port 8084) ─────────────────────────────────────────
+const safe = (promise) => promise.catch(() => ({ data: null }));
+
 export const analyticsApi = {
-  responseTimes:      (p) => analyticsHttp.get('/analytics/response-times', { params: p }).catch(() => ({ data: null })),
-  incidentsByRegion:  (p) => analyticsHttp.get('/analytics/incidents-by-region', { params: p }).catch(() => ({ data: [] })),
-  resourceUtil:       (p) => analyticsHttp.get('/analytics/resource-utilization', { params: p }).catch(() => ({ data: [] })),
-  hospitalCapacity:   () => analyticsHttp.get('/analytics/hospital-capacity').catch(() => ({ data: [] })),
-  incidentTrends:     (p) => analyticsHttp.get('/analytics/incident-trends', { params: p }).catch(() => ({ data: [] })),
-  peakHours:          () => analyticsHttp.get('/analytics/peak-hours').catch(() => ({ data: [] })),
-  topResponders:      () => analyticsHttp.get('/analytics/top-responders').catch(() => ({ data: [] })),
-  summary:            () => analyticsHttp.get('/analytics/summary-dashboard').catch(() => ({ data: null })),
+  summary:           () => safe(analyticsHttp.get('/analytics/summary-dashboard')),
+  responseTimes:     () => safe(analyticsHttp.get('/analytics/response-times')),
+  incidentsByRegion: () => safe(analyticsHttp.get('/analytics/incidents-by-region')),
+  resourceUtil:      () => safe(analyticsHttp.get('/analytics/resource-utilization')),
+  hospitalCapacity:  () => safe(analyticsHttp.get('/analytics/hospital-capacity')),
+  incidentTrends:    () => safe(analyticsHttp.get('/analytics/incident-trends')),
+  peakHours:         () => safe(analyticsHttp.get('/analytics/peak-hours')),
+  topResponders:     () => safe(analyticsHttp.get('/analytics/top-responders')),
 };

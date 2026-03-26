@@ -1,5 +1,6 @@
 package com.emergency.auth_service.controller;
 
+import com.emergency.auth_service.dto.UserProfileResponse;
 import com.emergency.auth_service.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -21,6 +23,13 @@ public class UserController {
 
     public UserController(UserService userService) {
         this.userService = userService;
+    }
+
+    @GetMapping
+    @Operation(summary = "List all users", description = "Returns all registered users. Requires SYSTEM_ADMIN role.")
+    @PreAuthorize("hasRole('ROLE_SYSTEM_ADMIN')")
+    public ResponseEntity<List<UserProfileResponse>> listUsers() {
+        return ResponseEntity.ok(userService.listAllUsers());
     }
 
     @PatchMapping("/{id}/activate")

@@ -1,109 +1,174 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { incidentApi } from '../api';
-import { PageHeader, Btn, DataTable, StatusBadge, SeverityBadge, TypeBadge, Card } from '../components/UI';
+import { useAuth } from '../context/AuthContext';
+import { PageHeader, Btn, DataTable, StatusBadge, SeverityBadge, TypeBadge, Card, Spinner } from '../components/UI';
 import { INCIDENT_TYPES, SEVERITY_LEVELS, INCIDENT_STATUSES, fmtDateTime, timeAgo } from '../utils/constants';
+import { Plus, Search, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-const MOCK = [
-  { id:'inc-001', citizenName:'Kwame Mensah',  incidentType:'MEDICAL_EMERGENCY', severity:'CRITICAL', status:'DISPATCHED',  latitude:5.6037,  longitude:-0.1870, createdAt: new Date(Date.now()-8*60000).toISOString(),    assignedUnit:'unit-a1' },
-  { id:'inc-002', citizenName:'Abena Osei',    incidentType:'FIRE',              severity:'HIGH',     status:'IN_PROGRESS', latitude:5.5502,  longitude:-0.2174, createdAt: new Date(Date.now()-22*60000).toISOString(),   assignedUnit:'unit-b2' },
-  { id:'inc-003', citizenName:'Kofi Asante',   incidentType:'CRIME',             severity:'HIGH',     status:'CREATED',     latitude:5.5580,  longitude:-0.1802, createdAt: new Date(Date.now()-35*60000).toISOString(),   assignedUnit:null },
-  { id:'inc-004', citizenName:'Ama Darkwa',    incidentType:'ACCIDENT',          severity:'CRITICAL', status:'DISPATCHED',  latitude:5.6698,  longitude:-0.0166, createdAt: new Date(Date.now()-47*60000).toISOString(),   assignedUnit:'unit-c3' },
-  { id:'inc-005', citizenName:'Yaw Boateng',   incidentType:'ROBBERY',           severity:'MEDIUM',   status:'RESOLVED',    latitude:5.5480,  longitude:-0.2190, createdAt: new Date(Date.now()-2*3600000).toISOString(),  assignedUnit:'unit-d4' },
-  { id:'inc-006', citizenName:'Efua Mensah',   incidentType:'MEDICAL_EMERGENCY', severity:'HIGH',     status:'RESOLVED',    latitude:6.6885,  longitude:1.6244,  createdAt: new Date(Date.now()-3*3600000).toISOString(),  assignedUnit:'unit-e5' },
-  { id:'inc-007', citizenName:'Nana Adjei',    incidentType:'FIRE',              severity:'LOW',      status:'RESOLVED',    latitude:4.8989,  longitude:-1.7577, createdAt: new Date(Date.now()-5*3600000).toISOString(),  assignedUnit:'unit-f6' },
-  { id:'inc-008', citizenName:'Akosua Darko',  incidentType:'CRIME',             severity:'MEDIUM',   status:'CREATED',     latitude:5.5480,  longitude:-0.2190, createdAt: new Date(Date.now()-10*60000).toISOString(),   assignedUnit:null },
-  { id:'inc-009', citizenName:'Kojo Amponsah', incidentType:'MEDICAL_EMERGENCY', severity:'HIGH',     status:'IN_PROGRESS', latitude:6.6870,  longitude:1.6230,  createdAt: new Date(Date.now()-90*60000).toISOString(),   assignedUnit:'unit-g7' },
-  { id:'inc-010', citizenName:'Adwoa Sarpong', incidentType:'ACCIDENT',          severity:'LOW',      status:'RESOLVED',    latitude:7.3349,  longitude:-2.3284, createdAt: new Date(Date.now()-6*3600000).toISOString(),  assignedUnit:'unit-h8' },
+const STATUS_TABS = [
+  { label: 'All',          value: '' },
+  { label: 'Created',      value: 'CREATED' },
+  { label: 'Dispatched',   value: 'DISPATCHED' },
+  { label: 'In Progress',  value: 'IN_PROGRESS' },
+  { label: 'Resolved',     value: 'RESOLVED' },
 ];
+
+const STATUS_COLORS = {
+  CREATED: 'var(--color-brand)', DISPATCHED: 'var(--color-dispatch)',
+  IN_PROGRESS: 'var(--color-warning)', RESOLVED: 'var(--color-success)',
+};
+
+const inputSel = {
+  background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--r-sm)', padding: '8px 32px 8px 12px', color: 'var(--text-secondary)',
+  fontSize: 12, outline: 'none', cursor: 'pointer', appearance: 'none', minWidth: 140,
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%237A93BF' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
+};
 
 export default function Incidents() {
   const navigate = useNavigate();
-  const [incidents, setIncidents] = useState(MOCK);
-  const [loading] = useState(false);
-  const [filter, setFilter] = useState({ status:'', type:'', severity:'' });
+  const { is } = useAuth();
+  const [incidents, setIncidents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('');
+  const [filter, setFilter] = useState({ type: '', severity: '' });
   const [search, setSearch] = useState('');
+  const [deleting, setDeleting] = useState(null);
 
-  useEffect(() => {
-    incidentApi.list().then(r => { if (r.data?.length) setIncidents(r.data); }).catch(()=>{});
-  }, []);
+  const load = () => {
+    setLoading(true);
+    incidentApi.list()
+      .then(r => setIncidents(r.data || []))
+      .catch(() => toast.error('Failed to load incidents'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this incident? This cannot be undone.')) return;
+    setDeleting(id);
+    try {
+      await incidentApi.delete(id);
+      toast.success('Incident deleted');
+      setIncidents(prev => prev.filter(i => i.id !== id));
+    } catch {
+      toast.error('Failed to delete incident');
+    } finally { setDeleting(null); }
+  };
 
   const filtered = incidents.filter(i => {
-    if (filter.status && i.status !== filter.status) return false;
+    if (activeTab && i.status !== activeTab) return false;
     if (filter.type && i.incidentType !== filter.type) return false;
     if (filter.severity && i.severity !== filter.severity) return false;
-    if (search && !i.citizenName?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return i.citizenName?.toLowerCase().includes(q) || i.incidentType?.toLowerCase().includes(q);
+    }
     return true;
   });
 
+  const tabCount = (val) => val ? incidents.filter(i => i.status === val).length : incidents.length;
+
   const cols = [
-    { key:'incidentType', label:'Type', w:130, render:(v) => <TypeBadge type={v} /> },
-    { key:'citizenName', label:'Citizen', render:(v,row) => (
-      <div>
-        <div style={{ fontWeight:600, fontSize:13 }}>{v}</div>
-        <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-mono)', marginTop:2 }}>{row.id?.slice(0,8)}...</div>
-      </div>
-    )},
-    { key:'severity',    label:'Severity', w:110, render:(v) => <SeverityBadge severity={v} /> },
-    { key:'status',      label:'Status',   w:130, render:(v) => <StatusBadge status={v} /> },
-    { key:'latitude',    label:'Location', w:180, render:(v,row) => <span style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-muted)' }}>{v?.toFixed(4)}, {row.longitude?.toFixed(4)}</span> },
-    { key:'createdAt',   label:'Reported', w:150, render:(v) => <div><div style={{ fontSize:12 }}>{fmtDateTime(v)}</div><div style={{ fontSize:11, color:'var(--text-muted)', marginTop:1 }}>{timeAgo(v)}</div></div> },
+    {
+      key: 'severity', label: 'Sev', w: 70, sortable: false,
+      render: (v) => <SeverityBadge severity={v} />,
+    },
+    {
+      key: 'citizenName', label: 'Citizen', w: 160,
+      render: (v, row) => (
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 13 }}>{v}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{timeAgo(row.createdAt)}</div>
+        </div>
+      ),
+    },
+    { key: 'incidentType', label: 'Type', render: (v) => <TypeBadge type={v} /> },
+    { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
+    {
+      key: 'createdAt', label: 'Reported', w: 160,
+      render: (v) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>{fmtDateTime(v)}</span>,
+    },
+    {
+      key: 'assignedUnit', label: 'Unit', w: 110, sortable: false,
+      render: (v) => v
+        ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-dispatch)' }}>{String(v).slice(0, 8)}…</span>
+        : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>,
+    },
+    ...(is('SYSTEM_ADMIN') ? [{
+      key: 'id', label: '', w: 44, sortable: false,
+      render: (v) => (
+        <button onClick={e => { e.stopPropagation(); handleDelete(v); }} disabled={deleting === v}
+          style={{ color: 'var(--color-danger)', opacity: deleting === v ? 0.4 : 1, display: 'flex', padding: 4 }}
+          title="Delete incident">
+          <Trash2 size={13} strokeWidth={2} />
+        </button>
+      ),
+    }] : []),
   ];
 
-  const statsBar = [
-    { label:'Total',       val:incidents.length,                                         color:'var(--text-secondary)' },
-    { label:'Open',        val:incidents.filter(i=>i.status!=='RESOLVED').length,        color:'var(--amber)' },
-    { label:'Dispatched',  val:incidents.filter(i=>i.status==='DISPATCHED').length,      color:'var(--cyan)' },
-    { label:'In Progress', val:incidents.filter(i=>i.status==='IN_PROGRESS').length,     color:'var(--orange)' },
-    { label:'Resolved',    val:incidents.filter(i=>i.status==='RESOLVED').length,        color:'var(--green)' },
-  ];
-
-  const selStyle = { background:'var(--bg-raised)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-sm)', padding:'9px 34px 9px 14px', color:'var(--text-muted)', fontSize:12, outline:'none', cursor:'pointer', appearance:'none', minWidth:140, backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237B92B8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat:'no-repeat', backgroundPosition:'right 10px center' };
+  if (loading) return <Spinner />;
 
   return (
-    <div style={{ animation:'fadeUp 0.3s ease' }}>
-      <PageHeader title="Incidents" subtitle={`${filtered.length} of ${incidents.length} records`}
-        actions={<Btn onClick={() => navigate('/incidents/new')} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>}>LOG INCIDENT</Btn>}
+    <div style={{ animation: 'fadeUp 0.3s ease' }}>
+      <PageHeader
+        title="Incidents"
+        subtitle={`${incidents.length} total · ${incidents.filter(i => i.status !== 'RESOLVED').length} open`}
+        actions={
+          is('SYSTEM_ADMIN','HOSPITAL_ADMIN','POLICE_ADMIN','FIRE_ADMIN') &&
+          <Btn icon={<Plus size={14} />} onClick={() => navigate('/incidents/new')}>Log Incident</Btn>
+        }
       />
 
-      <Card style={{ padding:'14px 24px', marginBottom:20 }}>
-        <div style={{ display:'flex', gap:32, flexWrap:'wrap' }}>
-          {statsBar.map(s => (
-            <div key={s.label} style={{ display:'flex', alignItems:'baseline', gap:8 }}>
-              <span style={{ fontFamily:'var(--font-display)', fontSize:24, fontWeight:800, color:s.color }}>{s.val}</span>
-              <span style={{ fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em' }}>{s.label}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
+      {/* Status tabs */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 0, overflowX: 'auto' }}>
+        {STATUS_TABS.map(tab => {
+          const isActive = activeTab === tab.value;
+          const color = STATUS_COLORS[tab.value] || 'var(--color-brand)';
+          return (
+            <button key={tab.value} onClick={() => setActiveTab(tab.value)}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 14px', fontSize: 12, fontWeight: isActive ? 700 : 500, cursor: 'pointer', borderRadius: 'var(--r-sm) var(--r-sm) 0 0', borderBottom: isActive ? `2px solid ${color}` : '2px solid transparent', color: isActive ? color : 'var(--text-muted)', background: isActive ? `color-mix(in srgb, ${color} 8%, transparent)` : 'transparent', whiteSpace: 'nowrap' }}>
+              {tab.label}
+              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', background: isActive ? `color-mix(in srgb, ${color} 18%, transparent)` : 'var(--bg-raised)', color: isActive ? color : 'var(--text-muted)', padding: '1px 6px', borderRadius: 'var(--r-full)' }}>
+                {tabCount(tab.value)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-      <Card style={{ marginBottom:20, padding:'16px 20px' }}>
-        <div style={{ display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
-          <div style={{ position:'relative', flex:1, minWidth:200 }}>
-            <svg style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', pointerEvents:'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by citizen name..."
-              style={{ width:'100%', background:'var(--bg-raised)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-sm)', padding:'9px 14px 9px 38px', color:'var(--text-primary)', fontSize:13, outline:'none' }}
-              onFocus={e=>e.target.style.borderColor='var(--amber)'} onBlur={e=>e.target.style.borderColor='var(--border-subtle)'}
-            />
-          </div>
-          <select value={filter.status} onChange={e=>setFilter(p=>({...p,status:e.target.value}))} style={selStyle} onFocus={e=>e.target.style.borderColor='var(--amber)'} onBlur={e=>e.target.style.borderColor='var(--border-subtle)'}>
-            <option value="">All Statuses</option>
-            {INCIDENT_STATUSES.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <select value={filter.type} onChange={e=>setFilter(p=>({...p,type:e.target.value}))} style={selStyle} onFocus={e=>e.target.style.borderColor='var(--amber)'} onBlur={e=>e.target.style.borderColor='var(--border-subtle)'}>
-            <option value="">All Types</option>
-            {INCIDENT_TYPES.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <select value={filter.severity} onChange={e=>setFilter(p=>({...p,severity:e.target.value}))} style={selStyle} onFocus={e=>e.target.style.borderColor='var(--amber)'} onBlur={e=>e.target.style.borderColor='var(--border-subtle)'}>
-            <option value="">All Severities</option>
-            {SEVERITY_LEVELS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          {(filter.status||filter.type||filter.severity||search) && <Btn variant="ghost" size="sm" onClick={()=>{setFilter({status:'',type:'',severity:''});setSearch('');}}>Clear</Btn>}
+      {/* Filter bar */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search citizen or type…"
+            style={{ width: '100%', background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-sm)', padding: '8px 12px 8px 32px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}
+            onFocus={e => e.target.style.borderColor = 'var(--color-brand)'}
+            onBlur={e => e.target.style.borderColor = 'var(--border-subtle)'}
+          />
         </div>
-      </Card>
+        <select value={filter.type} onChange={e => setFilter(f => ({ ...f, type: e.target.value }))} style={inputSel}>
+          <option value="">All Types</option>
+          {INCIDENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <select value={filter.severity} onChange={e => setFilter(f => ({ ...f, severity: e.target.value }))} style={inputSel}>
+          <option value="">All Severities</option>
+          {SEVERITY_LEVELS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+      </div>
 
-      <Card style={{ padding:0 }}>
-        <DataTable cols={cols} rows={filtered} onRowClick={row=>navigate(`/incidents/${row.id}`)} loading={loading} emptyTitle="No incidents found" emptyIcon="🚨" />
+      <Card style={{ padding: 0 }}>
+        <DataTable
+          cols={cols}
+          rows={filtered}
+          onRowClick={row => navigate(`/incidents/${row.id}`)}
+          emptyTitle="No incidents"
+          emptyMsg="Try adjusting your search or filters."
+        />
       </Card>
     </div>
   );

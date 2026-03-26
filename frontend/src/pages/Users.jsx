@@ -1,192 +1,191 @@
 import { useState, useEffect } from 'react';
 import { authApi } from '../api';
-import { PageHeader, Card, Btn, DataTable, Modal, Field, Input, Select, SectionTitle } from '../components/UI';
-import { USER_ROLES, getRoleLabel, fmtDateTime } from '../utils/constants';
-import { useAuth } from '../context/AuthContext';
+import { PageHeader, Card, DataTable, Btn, Modal, Field, Input, Select, Spinner } from '../components/UI';
+import { USER_ROLES, ROLE_COLORS, getRoleLabel, fmtDate } from '../utils/constants';
+import { UserPlus, ShieldAlert, Building2, Shield, Flame, ToggleLeft, ToggleRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const MOCK_USERS = [
-  { id:'u1', name:'Vanessa Ayertey',  email:'admin@emergency.gov.gh',   role:'SYSTEM_ADMIN',  isActive:true,  lastLoginAt: new Date(Date.now()-5*60000).toISOString(),    createdAt: new Date('2026-01-15').toISOString() },
-  { id:'u2', name:'Fareed Ahmed',     email:'fareed@emergency.gov.gh',   role:'SYSTEM_ADMIN',  isActive:true,  lastLoginAt: new Date(Date.now()-2*3600000).toISOString(),  createdAt: new Date('2026-01-15').toISOString() },
-  { id:'u3', name:'Ama Owusu',        email:'ama@korlebu.gov.gh',        role:'HOSPITAL_ADMIN',isActive:true,  lastLoginAt: new Date(Date.now()-1*3600000).toISOString(),  createdAt: new Date('2026-01-20').toISOString() },
-  { id:'u4', name:'Kofi Boateng',     email:'kofi@accrapolice.gov.gh',   role:'POLICE_ADMIN',  isActive:true,  lastLoginAt: new Date(Date.now()-30*60000).toISOString(),   createdAt: new Date('2026-02-01').toISOString() },
-  { id:'u5', name:'Akua Mensah',      email:'akua@accrafire.gov.gh',     role:'FIRE_ADMIN',    isActive:true,  lastLoginAt: new Date(Date.now()-4*3600000).toISOString(),  createdAt: new Date('2026-02-05').toISOString() },
-  { id:'u6', name:'Kwame Asante',     email:'kwame@kumasihosp.gov.gh',   role:'HOSPITAL_ADMIN',isActive:false, lastLoginAt: new Date(Date.now()-7*86400000).toISOString(), createdAt: new Date('2026-02-10').toISOString() },
-];
+const ROLE_ICONS = {
+  SYSTEM_ADMIN:   <ShieldAlert size={12} strokeWidth={2} />,
+  HOSPITAL_ADMIN: <Building2  size={12} strokeWidth={2} />,
+  POLICE_ADMIN:   <Shield     size={12} strokeWidth={2} />,
+  FIRE_ADMIN:     <Flame      size={12} strokeWidth={2} />,
+};
 
 export default function Users() {
-  const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState(MOCK_USERS);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name:'', email:'', password:'', role:'' });
-  const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [deactivating, setDeactivating] = useState(null);
+  const [users, setUsers]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [filterRole, setFilterRole] = useState('');
+  const [search, setSearch]       = useState('');
+  const [modal, setModal]         = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [toggling, setToggling]   = useState(null);
+  const [form, setForm]           = useState({ name: '', email: '', password: '', role: 'SYSTEM_ADMIN' });
 
-  useEffect(() => {
-    authApi.listUsers().then(r => { if (r.data?.length) setUsers(r.data); }).catch(() => {});
-  }, []);
-
-  const validate = () => {
-    const e = {};
-    if (!form.name.trim()) e.name = 'Name is required';
-    if (!form.email.trim()) e.email = 'Email is required';
-    if (!form.password || form.password.length < 6) e.password = 'Password must be at least 6 characters';
-    if (!form.role) e.role = 'Role is required';
-    return e;
+  const load = () => {
+    setLoading(true);
+    authApi.listUsers()
+      .then(r => setUsers(r.data || []))
+      .catch(() => toast.error('Failed to load users'))
+      .finally(() => setLoading(false));
   };
 
-  const handleRegister = async () => {
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setSubmitting(true);
+  useEffect(() => { load(); }, []);
+
+  const handleToggle = async (u) => {
+    const activate = !(u.enabled ?? true);
+    if (!window.confirm(`${activate ? 'Activate' : 'Deactivate'} ${u.name}?`)) return;
+    setToggling(u.userId || u.id);
+    try {
+      if (activate) await authApi.activateUser(u.userId || u.id);
+      else          await authApi.deactivateUser(u.userId || u.id);
+      toast.success(`${u.name} ${activate ? 'activated' : 'deactivated'}`);
+      load();
+    } catch { toast.error('Failed to update user status'); }
+    finally { setToggling(null); }
+  };
+
+  const handleCreate = async e => {
+    e.preventDefault();
+    if (!form.name || !form.email || !form.password || !form.role) { toast.error('Please fill all required fields'); return; }
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) { toast.error('Please enter a valid email address'); return; }
+    if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
+    setSaving(true);
     try {
       await authApi.register(form);
       toast.success('User registered successfully');
       setModal(false);
-      setForm({ name:'', email:'', password:'', role:'' });
-      setErrors({});
+      setForm({ name: '', email: '', password: '', role: 'SYSTEM_ADMIN' });
       load();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to register user');
-    } finally { setSubmitting(false); }
+      toast.error(err.response?.data?.message || 'Failed to create user');
+    } finally { setSaving(false); }
   };
 
-  const handleDeactivate = async (id) => {
-    setDeactivating(id);
-    try {
-      await authApi.deactivateUser(id);
-      toast.success('User deactivated');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to deactivate user');
-    } finally { setDeactivating(null); }
-  };
+  const displayed = users.filter(u => {
+    if (filterRole && u.role !== filterRole) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
-  const roleColors = { SYSTEM_ADMIN:'var(--amber)', HOSPITAL_ADMIN:'var(--green)', POLICE_ADMIN:'var(--cyan)', FIRE_ADMIN:'var(--orange)' };
+  // Role summary counts
+  const roleCounts = USER_ROLES.map(r => ({ ...r, count: users.filter(u => u.role === r.value).length }));
 
   const cols = [
-    { key:'name', label:'Name', render:(v,row) => (
-      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-        <div style={{
-          width:32, height:32, borderRadius:'var(--r-sm)',
-          background: `${roleColors[row.role] || 'var(--text-muted)'}20`,
-          border: `1px solid ${roleColors[row.role] || 'var(--border-subtle)'}40`,
-          display:'flex', alignItems:'center', justifyContent:'center',
-          fontFamily:'var(--font-display)', fontWeight:800, fontSize:14,
-          color: roleColors[row.role] || 'var(--text-secondary)', flexShrink:0,
-        }}>
-          {v?.charAt(0)?.toUpperCase()}
-        </div>
-        <div>
-          <div style={{ fontWeight:600, fontSize:13, color:'var(--text-primary)' }}>{v}</div>
-          <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-mono)' }}>{row.email}</div>
-        </div>
-      </div>
-    )},
-    { key:'role', label:'Role', w:200, render:(v) => {
-      const color = roleColors[v] || 'var(--text-muted)';
-      return (
-        <span style={{ fontSize:11, fontWeight:700, color, background:`${color}15`, border:`1px solid ${color}30`, padding:'3px 10px', borderRadius:20, textTransform:'uppercase', letterSpacing:'0.08em' }}>
-          {getRoleLabel(v)}
-        </span>
-      );
-    }},
-    { key:'isActive', label:'Status', w:100, render:(v) => (
-      <span style={{
-        fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, textTransform:'uppercase', letterSpacing:'0.08em',
-        color: v === false ? 'var(--red)' : 'var(--green)',
-        background: v === false ? 'var(--red-soft)' : 'var(--green-soft)',
-        border: `1px solid ${v === false ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`,
-      }}>
-        {v === false ? 'Inactive' : 'Active'}
-      </span>
-    )},
-    { key:'lastLoginAt', label:'Last Login', w:170, render:(v) => <span style={{ fontSize:12, color:'var(--text-muted)' }}>{v ? fmtDateTime(v) : 'Never'}</span> },
-    { key:'createdAt', label:'Joined', w:140, render:(v) => <span style={{ fontSize:12, color:'var(--text-muted)' }}>{fmtDateTime(v)}</span> },
-    { key:'id', label:'', w:80, render:(v, row) => (
-      row.id !== currentUser?.id && row.isActive !== false ? (
-        <Btn variant="danger" size="sm" loading={deactivating === v} onClick={(e) => { e.stopPropagation(); handleDeactivate(v); }}>
-          Deactivate
-        </Btn>
-      ) : null
-    )},
+    {
+      key: 'name', label: 'User',
+      render: (v, row) => {
+        const color = ROLE_COLORS[row.role] || 'var(--text-muted)';
+        const initials = v?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 'var(--r-sm)', background: `color-mix(in srgb, ${color} 18%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 800, color, flexShrink: 0 }}>
+              {initials}
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{v}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{row.email}</div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'role', label: 'Role',
+      render: (v) => {
+        const color = ROLE_COLORS[v] || 'var(--text-muted)';
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 'var(--r-full)', fontSize: 10, fontWeight: 700, color, background: `color-mix(in srgb, ${color} 13%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 28%, transparent)` }}>
+            {ROLE_ICONS[v]}{getRoleLabel(v)}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'createdDate', label: 'Joined', w: 130,
+      render: (v) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>{fmtDate(v)}</span>,
+    },
+    {
+      key: 'enabled', label: 'Status', w: 100, sortable: false,
+      render: (v, row) => {
+        const isEnabled = v !== false; // default true if field missing
+        const uid = row.userId || row.id;
+        const isToggling = toggling === uid;
+        return (
+          <button onClick={e => { e.stopPropagation(); handleToggle(row); }} disabled={isToggling}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, color: isEnabled ? 'var(--color-success)' : 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}
+            title={isEnabled ? 'Click to deactivate' : 'Click to activate'}>
+            {isEnabled ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+            {isEnabled ? 'Active' : 'Inactive'}
+          </button>
+        );
+      },
+    },
   ];
 
-  const roleCounts = USER_ROLES.map(r => ({ ...r, count: users.filter(u=>u.role===r.value).length, color: roleColors[r.value] }));
+  if (loading) return <Spinner />;
 
   return (
-    <div style={{ animation:'fadeUp 0.3s ease' }}>
+    <div style={{ animation: 'fadeUp 0.3s ease' }}>
       <PageHeader
         title="User Management"
         subtitle={`${users.length} registered operators`}
-        actions={
-          <Btn onClick={() => setModal(true)}
-            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>}
-          >
-            Register Operator
-          </Btn>
-        }
+        actions={<Btn icon={<UserPlus size={14} />} onClick={() => setModal(true)}>Add User</Btn>}
       />
 
-      {/* Role breakdown */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:14, marginBottom:20 }}>
-        {roleCounts.map(r => (
-          <Card key={r.value} style={{ padding:'16px 20px' }}>
-            <div style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:800, color:r.color, lineHeight:1 }}>{loading ? '—' : r.count}</div>
-            <div style={{ fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em', marginTop:4 }}>{r.label.replace(' Administrator','').replace(' Admin','')}</div>
-          </Card>
-        ))}
+      {/* Role filter cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+        {roleCounts.map(r => {
+          const color = ROLE_COLORS[r.value];
+          const isActive = filterRole === r.value;
+          return (
+            <button key={r.value} onClick={() => setFilterRole(isActive ? '' : r.value)}
+              style={{ padding: '12px 14px', borderRadius: 'var(--r-md)', border: `1px solid ${isActive ? color : 'var(--border-subtle)'}`, background: isActive ? `color-mix(in srgb, ${color} 10%, transparent)` : 'var(--bg-surface)', cursor: 'pointer', textAlign: 'left', transition: 'all var(--ease-fast)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: isActive ? color : 'var(--text-primary)', lineHeight: 1 }}>{r.count}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4 }}>{r.label}</div>
+            </button>
+          );
+        })}
       </div>
 
-      <Card style={{ padding:0 }}>
-        <DataTable
-          cols={cols}
-          rows={users}
-          loading={loading}
-          emptyTitle="No users registered"
-          emptyIcon="👤"
+      {/* Search */}
+      <div style={{ marginBottom: 16 }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or email…"
+          style={{ width: '100%', maxWidth: 300, background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-sm)', padding: '8px 12px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}
+          onFocus={e => e.target.style.borderColor = 'var(--color-brand)'}
+          onBlur={e => e.target.style.borderColor = 'var(--border-subtle)'}
         />
+      </div>
+
+      <Card style={{ padding: 0 }}>
+        <DataTable cols={cols} rows={displayed} emptyTitle="No users found" emptyMsg="Try adjusting your search or role filter." />
       </Card>
 
-      {/* Register modal */}
-      <Modal open={modal} onClose={() => { setModal(false); setErrors({}); }} title="Register New Operator">
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <Field label="Full Name" required error={errors.name}>
-            <Input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Kwame Mensah" autoFocus />
+      {/* Add user modal */}
+      <Modal open={modal} onClose={() => setModal(false)} title="Register New User">
+        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Field label="Full Name" required>
+            <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" autoFocus />
           </Field>
-          <Field label="Email Address" required error={errors.email}>
-            <Input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="operator@emergency.gov.gh" />
+          <Field label="Email Address" required>
+            <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@emergency.gov.gh" />
           </Field>
-          <Field label="Password" required error={errors.password} hint="Minimum 6 characters">
-            <Input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="••••••••••" />
+          <Field label="Password" required>
+            <Input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Minimum 8 characters" />
           </Field>
-          <Field label="Role" required error={errors.role}>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {USER_ROLES.map(r => {
-                const color = roleColors[r.value] || 'var(--text-secondary)';
-                return (
-                  <button key={r.value} type="button"
-                    onClick={() => { setForm(f=>({...f,role:r.value})); setErrors(e=>({...e,role:''})); }}
-                    style={{
-                      padding:'11px 14px', borderRadius:'var(--r-sm)', border:'2px solid', textAlign:'left', cursor:'pointer',
-                      borderColor: form.role===r.value ? color : 'var(--border-subtle)',
-                      background: form.role===r.value ? `${color}12` : 'var(--bg-raised)',
-                      color: form.role===r.value ? color : 'var(--text-secondary)',
-                      fontSize:13, fontWeight:600, transition:'all var(--ease-fast)',
-                    }}>
-                    {r.label}
-                  </button>
-                );
-              })}
-            </div>
+          <Field label="Role" required>
+            <Select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+              {USER_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </Select>
           </Field>
-          <div style={{ display:'flex', gap:10, justifyContent:'flex-end', paddingTop:8 }}>
-            <Btn variant="secondary" onClick={() => { setModal(false); setErrors({}); }}>Cancel</Btn>
-            <Btn onClick={handleRegister} loading={submitting}>Register Operator</Btn>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+            <Btn variant="secondary" type="button" onClick={() => setModal(false)}>Cancel</Btn>
+            <Btn type="submit" loading={saving}>Register User</Btn>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );

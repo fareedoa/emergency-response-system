@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Mail, Lock, Eye, EyeOff, LogIn, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// Role → landing page mapping
+const ROLE_HOME = {
+  SYSTEM_ADMIN:   '/dashboard',
+  HOSPITAL_ADMIN: '/dashboard',
+  POLICE_ADMIN:   '/dashboard',
+  FIRE_ADMIN:     '/dashboard',
+};
 
 export default function Login() {
   const { login } = useAuth();
@@ -10,190 +19,158 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [errors, setErrors] = useState({ email: '', password: '' });
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!email || !password) { toast.error('Please fill all fields'); return; }
+    const newErrs = { email: '', password: '' };
+    if (!email) newErrs.email = 'Email is required';
+    else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) newErrs.email = 'Please enter a valid email address';
+    
+    if (!password) newErrs.password = 'Password is required';
+    
+    if (newErrs.email || newErrs.password) {
+      setErrors(newErrs);
+      return;
+    }
+    
+    setErrors({ email: '', password: '' });
     setLoading(true);
     try {
-      await login(email, password);
+      const user = await login(email, password);
       toast.success('Access granted');
-      navigate('/dashboard');
+      navigate(ROLE_HOME[user?.role] || '/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Authentication failed. Check credentials.');
     } finally { setLoading(false); }
   };
 
   return (
-    <div style={{ minHeight:'100vh', background:'var(--bg-void)', display:'flex', position:'relative', overflow:'hidden' }}>
-
-      {/* Grid background */}
-      <div style={{
-        position:'absolute', inset:0, pointerEvents:'none',
-        backgroundImage:'linear-gradient(rgba(245,158,11,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(245,158,11,0.03) 1px, transparent 1px)',
-        backgroundSize:'60px 60px',
-      }} />
-
-      {/* Radial glow */}
-      <div style={{
-        position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-        width:600, height:600, borderRadius:'50%',
-        background:'radial-gradient(circle, rgba(245,158,11,0.05) 0%, transparent 70%)',
-        pointerEvents:'none',
-      }} />
-
-      {/* Scan line animation */}
-      <div style={{
-        position:'absolute', left:0, right:0, height:2,
-        background:'linear-gradient(90deg, transparent, rgba(245,158,11,0.4), transparent)',
-        animation:'scandown 10s ease-in-out infinite', pointerEvents:'none',
-      }} />
-
+    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', position: 'relative', overflow: 'hidden' }}>
+      {/* Grid bg */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: `linear-gradient(var(--grid-overlay) 1px, transparent 1px), linear-gradient(90deg, var(--grid-overlay) 1px, transparent 1px)`, backgroundSize: '60px 60px' }} />
+      {/* Glow */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, var(--brand-soft) 0%, transparent 65%)', pointerEvents: 'none' }} />
+      {/* Scan line */}
+      <div style={{ position: 'absolute', left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, var(--brand-glow), transparent)', animation: 'scandown 12s ease-in-out infinite', pointerEvents: 'none' }} />
       {/* Corner decorators */}
-      {[['top:24px','left:24px','borderTop:2px solid','borderLeft:2px solid'],
-        ['bottom:24px','right:24px','borderBottom:2px solid','borderRight:2px solid']].map((corners, i) => (
-        <div key={i} style={{
-          position:'absolute', width:50, height:50,
-          ...Object.fromEntries(corners.map(s => { const [k,v]=s.split(':'); return [k.trim(), v.trim()]; })),
-          borderColor:'rgba(245,158,11,0.25)', pointerEvents:'none',
-        }} />
+      {[{ top: '20px', left: '20px', borderTop: '2px solid var(--brand-border)', borderLeft: '2px solid var(--brand-border)' }, { bottom: '20px', right: '20px', borderBottom: '2px solid var(--brand-border)', borderRight: '2px solid var(--brand-border)' }].map((s, i) => (
+        <div key={i} style={{ position: 'absolute', width: 48, height: 48, pointerEvents: 'none', ...s }} />
       ))}
 
-      {/* Left panel - branding */}
-      <div style={{ display:'none', flex:1, flexDirection:'column', justifyContent:'center', alignItems:'flex-start', padding:'60px 80px', borderRight:'1px solid var(--border-faint)', '@media(min-width:1024px)':{display:'flex'} }}>
+      {/* ── LEFT PANEL ── */}
+      <div className="login-left" style={{ flex: 1, flexDirection: 'column', justifyContent: 'center', gap: 32, padding: '60px 72px', borderRight: '1px solid var(--border-faint)', display: 'none' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 40 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 'var(--r-md)', background: 'var(--color-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-brand)' }}>
+              <Activity size={28} color="var(--on-brand)" strokeWidth={2.5} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 28, color: 'var(--color-brand)', letterSpacing: '0.1em', lineHeight: 1 }}>SwiftAid</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginTop: 3 }}>National Emergency Response</div>
+            </div>
+          </div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.15, marginBottom: 16, letterSpacing: '-0.02em' }}>Ghana's Critical<br />Infrastructure Platform</h1>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, maxWidth: 380 }}>Coordinating police, fire, hospitals and ambulances across all regions in real-time. Every second counts — this system makes them count.</p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {[{ val: '24 / 7', label: 'Always On', color: 'var(--color-success)' }, { val: '10+', label: 'Regions', color: 'var(--color-dispatch)' }, { val: '< 8m', label: 'Avg Dispatch', color: 'var(--color-brand)' }, { val: '4', label: 'Services', color: 'var(--color-warning)' }].map(s => (
+            <div key={s.label} style={{ padding: '16px 18px', background: 'var(--bg-raised)', border: '1px solid var(--border-faint)', borderRadius: 'var(--r-md)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.val}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 5 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {[['Ambulance', 'var(--color-success)'], ['Police', 'var(--color-dispatch)'], ['Fire Service', 'var(--color-danger)'], ['Hospitals', 'var(--color-brand)']].map(([label, color]) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', background: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`, borderRadius: 'var(--r-full)', fontSize: 12, color: 'var(--text-secondary)' }}>{label}</div>
+          ))}
+        </div>
       </div>
 
-      {/* Center/Right - form panel */}
-      <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-        <div style={{
-          width:'100%', maxWidth:420, animation:'fadeUp 0.5s ease',
-        }}>
-          {/* Logo block */}
-          <div style={{ marginBottom:40 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:12 }}>
-              <div style={{
-                width:48, height:48, borderRadius:'var(--r-md)',
-                background:'var(--amber)', display:'flex', alignItems:'center', justifyContent:'center',
-                boxShadow:'var(--shadow-amber)',
-              }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontFamily:'var(--font-display)', fontWeight:800, fontSize:26, color:'var(--amber)', letterSpacing:'0.12em', lineHeight:1 }}>SwiftAid</div>
-                <div style={{ fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em', marginTop:3 }}>Emergency Response Platform</div>
-              </div>
+      {/* ── RIGHT PANEL — Form ── */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ width: '100%', maxWidth: 420, animation: 'fadeUp 0.5s ease' }}>
+          {/* Mobile logo */}
+          <div className="login-mobile-logo" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 'var(--r-md)', background: 'var(--color-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-brand)', flexShrink: 0 }}>
+              <Activity size={24} color="var(--on-brand)" strokeWidth={2.5} />
             </div>
-              SwiftAid
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--color-brand)', letterSpacing: '0.08em', lineHeight: 1 }}>SwiftAid</div>
+              <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Emergency Response Platform</div>
+            </div>
           </div>
 
-          {/* Form card */}
-          <div style={{
-            background:'var(--bg-surface)', border:'1px solid var(--border-subtle)',
-            borderRadius:'var(--r-xl)', padding:'32px 32px 28px', boxShadow:'var(--shadow-lg)',
-            position:'relative', overflow:'hidden',
-          }}>
-            {/* Top accent */}
-            <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'linear-gradient(90deg, transparent, var(--amber), transparent)' }} />
-
-
-            <div style={{ marginBottom:22 }}>
-              <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:800, marginBottom:4 }}>Operator Sign In</h2>
-              <p style={{ fontSize:12, color:'var(--text-muted)' }}>Authorized personnel only. All access is logged.</p>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-xl)', padding: '32px', boxShadow: 'var(--shadow-lg)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, var(--color-brand), transparent)' }} />
+            <div style={{ marginBottom: 24 }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 800, marginBottom: 5 }}>Operator Sign In</h2>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Authorised personnel only. All access is logged.</p>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:18 }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {/* Email */}
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                <label style={{ fontSize:11, fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.1em' }}>Email Address</label>
-                <div style={{ position:'relative' }}>
-                  <svg style={{ position:'absolute', left:13, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', pointerEvents:'none' }}
-                    width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
-                  </svg>
-                  <input
-                    type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                    placeholder="operator@emergency.gov.gh" required autoComplete="username"
-                    style={{
-                      width:'100%', background:'var(--bg-raised)', border:'1px solid var(--border-subtle)',
-                      borderRadius:'var(--r-sm)', padding:'11px 14px 11px 40px',
-                      color:'var(--text-primary)', fontSize:13, outline:'none', transition:'all var(--ease-fast)',
-                    }}
-                    onFocus={e=>{e.target.style.borderColor='var(--amber)';e.target.style.boxShadow='0 0 0 3px var(--amber-soft)';}}
-                    onBlur={e=>{e.target.style.borderColor='var(--border-subtle)';e.target.style.boxShadow='none';}}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: errors.email ? 'var(--color-danger)' : 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Email Address</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: errors.email ? 'var(--color-danger)' : 'var(--text-muted)', pointerEvents: 'none' }} />
+                  <input type="email" value={email} onChange={e => {setEmail(e.target.value); if(errors.email) setErrors({...errors, email: ''})}} placeholder="operator@emergency.gov.gh" autoComplete="username"
+                    style={{ width: '100%', background: 'var(--bg-raised)', border: `1px solid ${errors.email ? 'var(--color-danger)' : 'var(--border-subtle)'}`, borderRadius: 'var(--r-sm)', padding: '11px 14px 11px 40px', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+                    onFocus={e => { e.target.style.borderColor = errors.email ? 'var(--color-danger)' : 'var(--color-brand)'; e.target.style.boxShadow = errors.email ? '0 0 0 3px color-mix(in srgb, var(--color-danger) 20%, transparent)' : '0 0 0 3px var(--brand-soft)'; }}
+                    onBlur={e => { e.target.style.borderColor = errors.email ? 'var(--color-danger)' : 'var(--border-subtle)'; e.target.style.boxShadow = 'none'; }}
                   />
                 </div>
+                {errors.email && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 2 }}>{errors.email}</div>}
               </div>
 
               {/* Password */}
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                <label style={{ fontSize:11, fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.1em' }}>Password</label>
-                <div style={{ position:'relative' }}>
-                  <svg style={{ position:'absolute', left:13, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', pointerEvents:'none' }}
-                    width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                  <input
-                    type={showPass ? 'text' : 'password'} value={password} onChange={e=>setPassword(e.target.value)}
-                    placeholder="••••••••••••••" required autoComplete="current-password"
-                    style={{
-                      width:'100%', background:'var(--bg-raised)', border:'1px solid var(--border-subtle)',
-                      borderRadius:'var(--r-sm)', padding:'11px 42px 11px 40px',
-                      color:'var(--text-primary)', fontSize:13, outline:'none', transition:'all var(--ease-fast)',
-                    }}
-                    onFocus={e=>{e.target.style.borderColor='var(--amber)';e.target.style.boxShadow='0 0 0 3px var(--amber-soft)';}}
-                    onBlur={e=>{e.target.style.borderColor='var(--border-subtle)';e.target.style.boxShadow='none';}}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: errors.password ? 'var(--color-danger)' : 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Password</label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: errors.password ? 'var(--color-danger)' : 'var(--text-muted)', pointerEvents: 'none' }} />
+                  <input type={showPass ? 'text' : 'password'} value={password} onChange={e => {setPassword(e.target.value); if(errors.password) setErrors({...errors, password: ''})}} placeholder="••••••••••••" autoComplete="current-password"
+                    style={{ width: '100%', background: 'var(--bg-raised)', border: `1px solid ${errors.password ? 'var(--color-danger)' : 'var(--border-subtle)'}`, borderRadius: 'var(--r-sm)', padding: '11px 42px 11px 40px', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+                    onFocus={e => { e.target.style.borderColor = errors.password ? 'var(--color-danger)' : 'var(--color-brand)'; e.target.style.boxShadow = errors.password ? '0 0 0 3px color-mix(in srgb, var(--color-danger) 20%, transparent)' : '0 0 0 3px var(--brand-soft)'; }}
+                    onBlur={e => { e.target.style.borderColor = errors.password ? 'var(--color-danger)' : 'var(--border-subtle)'; e.target.style.boxShadow = 'none'; }}
                   />
-                  <button type="button" onClick={()=>setShowPass(s=>!s)}
-                    style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:0 }}>
-                    {showPass
-                      ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                      : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    }
+                  <button type="button" onClick={() => setShowPass(s => !s)} aria-label={showPass ? 'Hide' : 'Show'} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', padding: 0, display: 'flex', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
+                {errors.password && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 2 }}>{errors.password}</div>}
               </div>
 
               {/* Submit */}
-              <button
-                type="submit" disabled={loading}
-                style={{
-                  marginTop:6, padding:'13px', width:'100%',
-                  background: loading ? 'rgba(245,158,11,0.5)' : 'var(--amber)',
-                  color:'#000', fontFamily:'var(--font-display)', fontSize:14, fontWeight:800,
-                  letterSpacing:'0.1em', borderRadius:'var(--r-sm)', border:'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  display:'flex', alignItems:'center', justifyContent:'center', gap:10,
-                  transition:'all var(--ease-fast)',
-                  boxShadow: loading ? 'none' : 'var(--shadow-amber)',
-                }}
-                onMouseEnter={e=>{ if (!loading) { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 0 32px rgba(245,158,11,0.5)'; }}}
-                onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=loading?'none':'var(--shadow-amber)'; }}
-              >
+              <button type="submit" disabled={loading} style={{ marginTop: 6, padding: '13px', width: '100%', background: loading ? 'var(--brand-dim)' : 'var(--color-brand)', color: 'var(--on-brand)', fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 'var(--r-sm)', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: loading ? 'none' : 'var(--shadow-brand)' }}
+                onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 0 36px var(--brand-glow)'; }}}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = loading ? 'none' : 'var(--shadow-brand)'; }}>
                 {loading
-                  ? <><span style={{ width:16, height:16, border:'2px solid rgba(0,0,0,0.3)', borderTopColor:'#000', borderRadius:'50%', animation:'spin 0.75s linear infinite', display:'inline-block' }} />AUTHENTICATING...</>
-                  : <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                    ACCESS COMMAND CENTER
-                  </>
+                  ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(0,0,0,0.3)', borderTopColor: 'rgba(0,0,0,0.8)', borderRadius: '50%', animation: 'spin 0.75s linear infinite', display: 'inline-block' }} />AUTHENTICATING...</>
+                  : <><LogIn size={16} strokeWidth={2.5} />ACCESS COMMAND CENTER</>
                 }
               </button>
             </form>
 
-            <div style={{ marginTop:18, fontSize:12, color:'var(--text-secondary)', textAlign:'center' }}>
-              Don't have an account? <Link to="/register" style={{ color:'var(--amber)', textDecoration:'none' }}>Register</Link>
+            <div style={{ marginTop: 18, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center' }}>
+              Don't have an account? <Link to="/register" style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Register</Link>
             </div>
           </div>
 
-          {/* Footer */}
-          <div style={{ marginTop:20, textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:12, fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text-muted)' }}>
-            <span>© {new Date().getFullYear()} SwiftAid</span>
-            <span style={{ color:'var(--border-normal)' }}>•</span>
-            <span>All rights reserved</span>
+          <div style={{ marginTop: 20, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
+            <span>© {new Date().getFullYear()} Republic of Ghana</span>
+            <span style={{ color: 'var(--border-normal)' }}>·</span>
+            <span>SwiftAid Emergency Platform</span>
           </div>
         </div>
       </div>
+
+      <style>{`
+        @media (min-width: 1024px) {
+          .login-left { display: flex !important; }
+          .login-mobile-logo { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 }
