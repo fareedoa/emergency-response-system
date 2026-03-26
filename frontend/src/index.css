@@ -1,3 +1,5 @@
+@import 'leaflet/dist/leaflet.css';
+
 /* ═══════════════════════════════════════════════════════
    SwiftAid DESIGN SYSTEM
    Theme: Deep Navy Command Center with Amber Highlights
@@ -140,3 +142,64 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-display); font-weight: 700; line-hei
 
 .anim-fadeUp { animation: fadeUp var(--ease-slow) forwards; }
 .anim-spin { animation: spin 1s linear infinite; }
+
+/* ── Leaflet dark theme overrides ── */
+.leaflet-container {
+  background: var(--bg-base) !important;
+  font-family: var(--font-body);
+}
+.leaflet-control-attribution {
+  background: rgba(7,11,24,0.8) !important;
+  color: var(--text-muted) !important;
+  font-size: 9px;
+  border-radius: var(--r-sm) 0 0 0 !important;
+  border-top: 1px solid var(--border-faint);
+  border-left: 1px solid var(--border-faint);
+}
+.leaflet-control-attribution a { color: var(--text-muted) !important; }
+.leaflet-control-zoom {
+  border: 1px solid var(--border-normal) !important;
+  border-radius: var(--r-sm) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-md) !important;
+}
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+  background: var(--bg-surface) !important;
+  color: var(--text-secondary) !important;
+  border-bottom: 1px solid var(--border-faint) !important;
+  font-size: 16px !important;
+  line-height: 26px !important;
+  transition: background var(--ease-fast), color var(--ease-fast);
+}
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+  background: var(--bg-hover) !important;
+  color: var(--amber) !important;
+}
+.leaflet-popup-content-wrapper {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-normal) !important;
+  border-radius: var(--r-md) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  font-family: var(--font-mono);
+  font-size: 12px !important;
+}
+.leaflet-popup-tip-container { display: none; }
+.leaflet-popup-close-button {
+  color: var(--text-muted) !important;
+  font-size: 16px !important;
+  padding: 4px 8px !important;
+}
+.leaflet-popup-close-button:hover { color: var(--text-primary) !important; }
+
+/* Pulsing ring animation used in custom markers */
+@keyframes leaflet-pulse {
+  0%, 100% { transform: scale(1);   opacity: 0.7; }
+  50%       { transform: scale(1.5); opacity: 0; }
+}

@@ -1,108 +1,60 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { incidentApi } from '../api';
-import { PageHeader, Btn, Card, Field, Input, Select, Textarea, SectionTitle } from '../components/UI';
-import { INCIDENT_TYPES, SEVERITY_LEVELS, getTypeInfo } from '../utils/constants';
+import { PageHeader, Btn, Card, Field, Input, Textarea, SectionTitle } from '../components/UI';
+import { INCIDENT_TYPES, SEVERITY_LEVELS } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
 
-// Ghana bounding box for validation
-const GH_BOUNDS = { minLat:4.5, maxLat:11.5, minLng:-3.5, maxLng:1.5 };
+// Ghana initial center
+const GH_CENTER = [5.6037, -0.1870]; // Accra
+
+// Custom marker for placing an incident pin
+const pinIcon = L.divIcon({
+  html: `
+    <div style="
+      position:relative; width:32px; height:32px;
+    ">
+      <div style="
+        position:absolute; bottom:0; left:50%; transform:translate(-50%, 50%);
+        width:12px; height:4px; border-radius:50%; background:rgba(0,0,0,0.5); filter:blur(2px);
+      "></div>
+      <div style="
+        width:32px; height:32px; border-radius:50%; background:var(--amber);
+        border:4px solid white; box-shadow:0 4px 14px rgba(245,158,11,0.6);
+        display:flex; align-items:center; justify-content:center;
+      ">
+        <div style="width:10px; height:10px; border-radius:50%; background:white;"></div>
+      </div>
+    </div>
+  `,
+  className: '',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+});
+
+function LocationPicker({ setForm, setErrors, position }) {
+  useMapEvents({
+    click(e) {
+      setForm(f => ({ ...f, latitude: e.latlng.lat.toFixed(6), longitude: e.latlng.lng.toFixed(6) }));
+      setErrors(errs => ({ ...errs, latitude: '', longitude: '' }));
+    }
+  });
+
+  return position ? <Marker position={position} icon={pinIcon} /> : null;
+}
 
 export default function NewIncident() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const mapRef = useRef(null);
-  const markerRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-
+  
   const [form, setForm] = useState({
     citizenName: '', incidentType: '', otherIncidentType: '', severity: '', latitude: '', longitude: '', notes: '',
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [locationSearch, setLocationSearch] = useState('');
-
-  // Load Google Maps
-  useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
-    if (!apiKey) { setMapLoaded(false); return; }
-    if (window.google?.maps) { initMap(); return; }
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.onload = () => { setMapLoaded(true); };
-    document.head.appendChild(script);
-    return () => {};
-  }, []);
-
-  useEffect(() => { if (mapLoaded) initMap(); }, [mapLoaded]);
-
-  const initMap = useCallback(() => {
-    if (!mapRef.current || !window.google) return;
-    const center = { lat: 5.6037, lng: -0.1870 }; // Accra
-    const map = new window.google.maps.Map(mapRef.current, {
-      center, zoom: 11,
-      styles: [ // Dark map style
-        { elementType:'geometry', stylers:[{color:'#0c1225'}] },
-        { elementType:'labels.text.fill', stylers:[{color:'#7b92b8'}] },
-        { elementType:'labels.text.stroke', stylers:[{color:'#0c1225'}] },
-        { featureType:'road', elementType:'geometry', stylers:[{color:'#162040'}] },
-        { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#1c2b50'}] },
-        { featureType:'water', elementType:'geometry', stylers:[{color:'#070b18'}] },
-        { featureType:'poi', stylers:[{visibility:'off'}] },
-      ],
-    });
-    mapInstanceRef.current = map;
-
-    // Click to place marker
-    map.addListener('click', (e) => {
-      placeMarker(e.latLng, map);
-    });
-
-    // Places autocomplete
-    const input = document.getElementById('location-search');
-    if (input) {
-      const autocomplete = new window.google.maps.places.Autocomplete(input, {
-        bounds: new window.google.maps.LatLngBounds(
-          { lat: GH_BOUNDS.minLat, lng: GH_BOUNDS.minLng },
-          { lat: GH_BOUNDS.maxLat, lng: GH_BOUNDS.maxLng }
-        ),
-        componentRestrictions: { country: 'gh' },
-      });
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place.geometry) {
-          map.setCenter(place.geometry.location);
-          map.setZoom(15);
-          placeMarker(place.geometry.location, map);
-        }
-      });
-    }
-  }, []);
-
-  const placeMarker = (latlng, map) => {
-    if (markerRef.current) markerRef.current.setMap(null);
-    const marker = new window.google.maps.Marker({
-      position: latlng,
-      map,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 10,
-        fillColor: '#F59E0B',
-        fillOpacity: 1,
-        strokeColor: '#000',
-        strokeWeight: 2,
-      },
-      animation: window.google.maps.Animation.DROP,
-    });
-    markerRef.current = marker;
-    const lat = typeof latlng.lat === 'function' ? latlng.lat() : latlng.lat;
-    const lng = typeof latlng.lng === 'function' ? latlng.lng() : latlng.lng;
-    setForm(f => ({ ...f, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
-    setErrors(e => ({ ...e, latitude:'', longitude:'' }));
-  };
 
   const validate = () => {
     const e = {};
@@ -110,7 +62,7 @@ export default function NewIncident() {
     if (!form.incidentType) e.incidentType = 'Incident type is required';
     if (form.incidentType === 'OTHER' && !form.otherIncidentType.trim()) e.otherIncidentType = 'Please describe the incident';
     if (!form.severity) e.severity = 'Severity is required';
-    if (!form.latitude || !form.longitude) e.latitude = 'Please select a location on the map';
+    if (!form.latitude || !form.longitude) e.latitude = 'Please click on the map to set a location';
     return e;
   };
 
@@ -138,6 +90,7 @@ export default function NewIncident() {
   };
 
   const selectedType = INCIDENT_TYPES.find(t => t.value === form.incidentType);
+  const position = form.latitude && form.longitude ? [parseFloat(form.latitude), parseFloat(form.longitude)] : null;
 
   return (
     <div style={{ animation:'fadeUp 0.3s ease', maxWidth:1100, margin:'0 auto' }}>
@@ -256,42 +209,26 @@ export default function NewIncident() {
             <Card>
               <SectionTitle>Incident Location</SectionTitle>
               <p style={{ fontSize:12, color:'var(--text-muted)', marginBottom:14, marginTop:-8 }}>
-                Search for an address or click on the map to set the incident location.
+                Click directly on the map to perfectly place the incident pin.
               </p>
-
-              {/* Search input */}
-              <div style={{ position:'relative', marginBottom:14 }}>
-                <svg style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', pointerEvents:'none' }}
-                  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-                </svg>
-                <input
-                  id="location-search" value={locationSearch} onChange={e=>setLocationSearch(e.target.value)}
-                  placeholder="Search location in Ghana..."
-                  style={{
-                    width:'100%', background:'var(--bg-raised)', border:'1px solid var(--border-subtle)',
-                    borderRadius:'var(--r-sm)', padding:'10px 14px 10px 38px', color:'var(--text-primary)', fontSize:13, outline:'none',
-                  }}
-                  onFocus={e=>{e.target.style.borderColor='var(--amber)';}}
-                  onBlur={e=>{e.target.style.borderColor='var(--border-subtle)';}}
-                />
-              </div>
 
               {/* Map container */}
               <div style={{ position:'relative', borderRadius:'var(--r-md)', overflow:'hidden', border:'1px solid var(--border-subtle)' }}>
-                <div ref={mapRef} style={{ width:'100%', height:340 }} />
-                {!window.google && !import.meta.env.VITE_GOOGLE_MAPS_KEY && (
-                  <div style={{
-                    position:'absolute', inset:0, background:'var(--bg-raised)', display:'flex', flexDirection:'column',
-                    alignItems:'center', justifyContent:'center', gap:12,
-                  }}>
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    <div style={{ textAlign:'center' }}>
-                      <div style={{ fontSize:13, color:'var(--text-secondary)', fontWeight:600 }}>Google Maps</div>
-                      <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4 }}>Set VITE_GOOGLE_MAPS_KEY in .env</div>
-                    </div>
-                  </div>
-                )}
+                <div style={{ width:'100%', height:340 }}>
+                  <MapContainer
+                    center={GH_CENTER}
+                    zoom={12}
+                    style={{ width: '100%', height: '100%', background: '#070B18' }}
+                    attributionControl={false}
+                  >
+                    <TileLayer
+                      url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                      subdomains="abcd"
+                      maxZoom={19}
+                    />
+                    <LocationPicker setForm={setForm} setErrors={setErrors} position={position} />
+                  </MapContainer>
+                </div>
               </div>
 
               {/* Coordinate display */}

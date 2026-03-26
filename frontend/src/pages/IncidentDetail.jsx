@@ -1,10 +1,36 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { incidentApi } from '../api';
-import { PageHeader, Btn, Card, StatusBadge, SeverityBadge, TypeBadge, Modal, Select, SectionTitle, Spinner, Empty } from '../components/UI';
+import { PageHeader, Btn, Card, StatusBadge, SeverityBadge, TypeBadge, Modal, SectionTitle, Spinner, Empty } from '../components/UI';
 import { NEXT_STATUS, INCIDENT_STATUSES, getTypeInfo, fmtDateTime, timeAgo } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import L from 'leaflet';
+
+// Custom marker for showing incident position
+const incidentPin = L.divIcon({
+  html: `
+    <div style="
+      position:relative; width:40px; height:40px;
+    ">
+      <div style="
+        position:absolute; inset:-10px; border-radius:50%;
+        border:2px solid var(--red); animation:pulse 2s ease-in-out infinite; opacity:0.5;
+      "></div>
+      <div style="
+        width:40px; height:40px; border-radius:50%; background:var(--red-soft);
+        border:2px solid var(--red); backdrop-filter:blur(4px); box-shadow:0 0 16px rgba(239,68,68,0.4);
+        display:flex; align-items:center; justify-content:center; font-size:18px;
+      ">
+        🚨
+      </div>
+    </div>
+  `,
+  className: '',
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+});
 
 export default function IncidentDetail() {
   const { id } = useParams();
@@ -65,18 +91,18 @@ export default function IncidentDetail() {
   const statusSteps = ['CREATED', 'DISPATCHED', 'IN_PROGRESS', 'RESOLVED'];
   const currentStep = statusSteps.indexOf(incident.status);
 
-  const statusColors = { CREATED:'var(--amber)', DISPATCHED:'var(--cyan)', IN_PROGRESS:'var(--orange)', RESOLVED:'var(--green)' };
+  const statusColors = { CREATED: 'var(--amber)', DISPATCHED: 'var(--cyan)', IN_PROGRESS: 'var(--orange)', RESOLVED: 'var(--green)' };
 
   return (
-    <div style={{ animation:'fadeUp 0.3s ease', maxWidth:1000, margin:'0 auto' }}>
+    <div style={{ animation: 'fadeUp 0.3s ease', maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader
         title={`Incident Report`}
         subtitle={`ID: ${incident.id}`}
         actions={
-          <div style={{ display:'flex', gap:10 }}>
+          <div style={{ display: 'flex', gap: 10 }}>
             {nextStatuses.length > 0 && (
               <Btn variant="cyan" onClick={() => { setNewStatus(nextStatuses[0]); setStatusModal(true); }}
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
+                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>}
               >
                 Update Status
               </Btn>
@@ -90,32 +116,32 @@ export default function IncidentDetail() {
       />
 
       {/* Status progress bar */}
-      <Card style={{ marginBottom:20, padding:'20px 28px' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:0 }}>
+      <Card style={{ marginBottom: 20, padding: '20px 28px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
           {statusSteps.map((step, i) => {
             const done = i <= currentStep;
             const active = i === currentStep;
             const color = statusColors[step];
             return (
-              <div key={step} style={{ display:'flex', alignItems:'center', flex: i < statusSteps.length-1 ? 1 : 'none' }}>
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, flexShrink:0 }}>
+              <div key={step} style={{ display: 'flex', alignItems: 'center', flex: i < statusSteps.length - 1 ? 1 : 'none' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <div style={{
-                    width:32, height:32, borderRadius:'50%', border:`2px solid ${done ? color : 'var(--border-subtle)'}`,
+                    width: 32, height: 32, borderRadius: '50%', border: `2px solid ${done ? color : 'var(--border-subtle)'}`,
                     background: done ? (active ? color : `${color}20`) : 'var(--bg-raised)',
-                    display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.3s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s',
                     boxShadow: active ? `0 0 16px ${color}40` : 'none',
                   }}>
                     {i < currentStep
-                      ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                      : <div style={{ width:8, height:8, borderRadius:'50%', background: done ? color : 'var(--border-normal)' }} />
+                      ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                      : <div style={{ width: 8, height: 8, borderRadius: '50%', background: done ? color : 'var(--border-normal)' }} />
                     }
                   </div>
-                  <span style={{ fontSize:10, fontWeight: active ? 700 : 400, color: done ? color : 'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.08em', whiteSpace:'nowrap' }}>
-                    {step.replace('_',' ')}
+                  <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, color: done ? color : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+                    {step.replace('_', ' ')}
                   </span>
                 </div>
-                {i < statusSteps.length-1 && (
-                  <div style={{ flex:1, height:2, background: i < currentStep ? color : 'var(--border-subtle)', margin:'0 8px', marginBottom:22, transition:'background 0.3s' }} />
+                {i < statusSteps.length - 1 && (
+                  <div style={{ flex: 1, height: 2, background: i < currentStep ? color : 'var(--border-subtle)', margin: '0 8px', marginBottom: 22, transition: 'background 0.3s' }} />
                 )}
               </div>
             );
@@ -123,30 +149,30 @@ export default function IncidentDetail() {
         </div>
       </Card>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 340px', gap:20, alignItems:'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
         {/* Main details */}
-        <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* Header card */}
           <Card glowColor={typeInfo.color}>
-            <div style={{ display:'flex', gap:16, alignItems:'flex-start' }}>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
               <div style={{
-                width:52, height:52, borderRadius:'var(--r-md)',
-                background:`${typeInfo.color}15`, border:`1px solid ${typeInfo.color}30`,
-                display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0,
+                width: 52, height: 52, borderRadius: 'var(--r-md)',
+                background: `${typeInfo.color}15`, border: `1px solid ${typeInfo.color}30`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0,
               }}>
                 {typeInfo.icon}
               </div>
-              <div style={{ flex:1 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6, flexWrap:'wrap' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
                   <TypeBadge type={incident.incidentType} />
                   <StatusBadge status={incident.status} />
                   <SeverityBadge severity={incident.severity} />
                 </div>
-                <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:800, marginBottom:4 }}>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 800, marginBottom: 4 }}>
                   {incident.incidentType === 'OTHER' ? incident.otherIncidentType : typeInfo.label}
                 </h2>
-                <p style={{ fontSize:12, color:'var(--text-muted)' }}>Reported {timeAgo(incident.createdAt)} · {fmtDateTime(incident.createdAt)}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Reported {timeAgo(incident.createdAt)} · {fmtDateTime(incident.createdAt)}</p>
               </div>
             </div>
           </Card>
@@ -154,24 +180,24 @@ export default function IncidentDetail() {
           {/* Info grid */}
           <Card>
             <SectionTitle>Incident Information</SectionTitle>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
               {[
-                { label:'Citizen Name', value: incident.citizenName },
-                { label:'Reported By', value: incident.createdBy || '—' },
-                { label:'Incident Type', value: typeInfo.label },
-                { label:'Severity', value: incident.severity },
-                { label:'Latitude', value: incident.latitude?.toFixed(6) },
-                { label:'Longitude', value: incident.longitude?.toFixed(6) },
-                { label:'Assigned Unit', value: incident.assignedUnit || 'Awaiting dispatch' },
-                { label:'Hospital ID', value: incident.hospitalId || '—' },
+                { label: 'Citizen Name', value: incident.citizenName },
+                { label: 'Reported By', value: incident.createdBy || '—' },
+                { label: 'Incident Type', value: typeInfo.label },
+                { label: 'Severity', value: incident.severity },
+                { label: 'Latitude', value: incident.latitude?.toFixed(6) },
+                { label: 'Longitude', value: incident.longitude?.toFixed(6) },
+                { label: 'Assigned Unit', value: incident.assignedUnit || 'Awaiting dispatch' },
+                { label: 'Hospital ID', value: incident.hospitalId || '—' },
               ].map((item, i) => (
                 <div key={item.label} style={{
-                  padding:'14px 16px',
+                  padding: '14px 16px',
                   borderBottom: i < 6 ? '1px solid var(--border-faint)' : 'none',
                   borderRight: i % 2 === 0 ? '1px solid var(--border-faint)' : 'none',
                 }}>
-                  <div style={{ fontSize:10, fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>{item.label}</div>
-                  <div style={{ fontSize:13, color:'var(--text-primary)', fontFamily: item.label.includes('titude') || item.label.includes('Unit') ? 'var(--font-mono)' : 'inherit', fontWeight: item.label === 'Assigned Unit' && incident.assignedUnit ? 600 : 400 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{item.label}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: item.label.includes('titude') || item.label.includes('Unit') ? 'var(--font-mono)' : 'inherit', fontWeight: item.label === 'Assigned Unit' && incident.assignedUnit ? 600 : 400 }}>
                     {item.value}
                   </div>
                 </div>
@@ -183,7 +209,7 @@ export default function IncidentDetail() {
           {incident.notes && (
             <Card>
               <SectionTitle>Notes</SectionTitle>
-              <p style={{ fontSize:13, color:'var(--text-secondary)', lineHeight:1.7, padding:'12px 16px', background:'var(--bg-raised)', borderRadius:'var(--r-sm)', borderLeft:'3px solid var(--amber)' }}>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, padding: '12px 16px', background: 'var(--bg-raised)', borderRadius: 'var(--r-sm)', borderLeft: '3px solid var(--amber)' }}>
                 {incident.notes}
               </p>
             </Card>
@@ -191,18 +217,35 @@ export default function IncidentDetail() {
 
           {/* Map */}
           {incident.latitude && incident.longitude && (
-            <Card>
-              <SectionTitle>Location</SectionTitle>
-              <div style={{ borderRadius:'var(--r-md)', overflow:'hidden', border:'1px solid var(--border-subtle)', height:220, background:'var(--bg-raised)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <div style={{ textAlign:'center' }}>
-                  <div style={{ fontSize:32, marginBottom:8 }}>📍</div>
-                  <div style={{ fontFamily:'var(--font-mono)', fontSize:13, color:'var(--amber)' }}>
-                    {incident.latitude?.toFixed(5)}, {incident.longitude?.toFixed(5)}
-                  </div>
-                  <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4 }}>
-                    <a href={`https://maps.google.com/?q=${incident.latitude},${incident.longitude}`} target="_blank" rel="noreferrer"
-                      style={{ color:'var(--cyan)', textDecoration:'underline' }}>Open in Google Maps →</a>
-                  </div>
+            <Card style={{ overflow: 'hidden', padding: 0 }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-faint)' }}>
+                <SectionTitle>Incident Location</SectionTitle>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>
+                  {incident.latitude?.toFixed(5)}, {incident.longitude?.toFixed(5)}
+                </div>
+              </div>
+              <div style={{ width: '100%', height: 260, position: 'relative', background: 'var(--bg-raised)' }}>
+                <MapContainer
+                  center={[incident.latitude, incident.longitude]}
+                  zoom={15}
+                  style={{ width: '100%', height: '100%', background: '#070B18' }}
+                  attributionControl={false}
+                  zoomControl={true}
+                >
+                  <TileLayer
+                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    subdomains="abcd"
+                    maxZoom={19}
+                  />
+                  <Marker position={[incident.latitude, incident.longitude]} icon={incidentPin} />
+                </MapContainer>
+
+                {/* External link overlay */}
+                <div style={{ position: 'absolute', bottom: 12, left: 12, zIndex: 1000 }}>
+                  <a href={`https://maps.google.com/?q=${incident.latitude},${incident.longitude}`} target="_blank" rel="noreferrer"
+                    style={{ background: 'var(--bg-surface)', padding: '6px 10px', borderRadius: 'var(--r-sm)', color: 'var(--cyan)', border: '1px solid var(--cyan-border)', fontSize: 11, fontWeight: 600, textDecoration: 'none', boxShadow: 'var(--shadow-md)', display: 'inline-block' }}>
+                    Open in Google Maps ↗
+                  </a>
                 </div>
               </div>
             </Card>
@@ -216,28 +259,28 @@ export default function IncidentDetail() {
             {timeline.length === 0
               ? <Empty icon="📋" title="No timeline yet" />
               : (
-                <div style={{ position:'relative' }}>
-                  <div style={{ position:'absolute', left:15, top:8, bottom:8, width:1, background:'var(--border-subtle)' }} />
+                <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'absolute', left: 15, top: 8, bottom: 8, width: 1, background: 'var(--border-subtle)' }} />
                   {timeline.map((event, i) => (
-                    <div key={i} style={{ display:'flex', gap:14, marginBottom:18, position:'relative' }}>
+                    <div key={i} style={{ display: 'flex', gap: 14, marginBottom: 18, position: 'relative' }}>
                       <div style={{
-                        width:30, height:30, borderRadius:'50%', background:'var(--bg-raised)',
-                        border:'2px solid var(--amber)', display:'flex', alignItems:'center', justifyContent:'center',
-                        flexShrink:0, zIndex:1,
+                        width: 30, height: 30, borderRadius: '50%', background: 'var(--bg-raised)',
+                        border: '2px solid var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, zIndex: 1,
                       }}>
-                        <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--amber)' }} />
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)' }} />
                       </div>
-                      <div style={{ paddingTop:4 }}>
-                        <div style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', marginBottom:2 }}>
+                      <div style={{ paddingTop: 4 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
                           {event.fieldName || event.action || 'Status change'}
                         </div>
                         {event.oldValue && (
-                          <div style={{ fontSize:11, color:'var(--text-muted)' }}>
-                            <span style={{ textDecoration:'line-through' }}>{event.oldValue}</span>
-                            {event.newValue && <span> → <span style={{ color:'var(--cyan)' }}>{event.newValue}</span></span>}
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            <span style={{ textDecoration: 'line-through' }}>{event.oldValue}</span>
+                            {event.newValue && <span> → <span style={{ color: 'var(--cyan)' }}>{event.newValue}</span></span>}
                           </div>
                         )}
-                        <div style={{ fontSize:10, color:'var(--text-muted)', marginTop:3, fontFamily:'var(--font-mono)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, fontFamily: 'var(--font-mono)' }}>
                           {fmtDateTime(event.revisionDate || event.timestamp)} · {event.modifiedBy || 'System'}
                         </div>
                       </div>
@@ -252,11 +295,11 @@ export default function IncidentDetail() {
 
       {/* Status update modal */}
       <Modal open={statusModal} onClose={() => setStatusModal(false)} title="Update Incident Status">
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <p style={{ fontSize:13, color:'var(--text-secondary)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             Current status: <StatusBadge status={incident.status} />
           </p>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {nextStatuses.map(s => {
               const info = INCIDENT_STATUSES.find(x => x.value === s);
               return (
@@ -265,19 +308,19 @@ export default function IncidentDetail() {
                   type="button"
                   onClick={() => setNewStatus(s)}
                   style={{
-                    padding:'12px 16px', borderRadius:'var(--r-sm)', border:`2px solid`,
+                    padding: '12px 16px', borderRadius: 'var(--r-sm)', border: `2px solid`,
                     borderColor: newStatus === s ? info.color : 'var(--border-subtle)',
                     background: newStatus === s ? `${info.color}15` : 'var(--bg-raised)',
                     color: newStatus === s ? info.color : 'var(--text-secondary)',
-                    cursor:'pointer', textAlign:'left', fontSize:13, fontWeight:600, transition:'all var(--ease-fast)',
+                    cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, transition: 'all var(--ease-fast)',
                   }}
                 >
-                  {s.replace('_',' ')}
+                  {s.replace('_', ' ')}
                 </button>
               );
             })}
           </div>
-          <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
             <Btn variant="secondary" onClick={() => setStatusModal(false)}>Cancel</Btn>
             <Btn onClick={handleStatusUpdate} loading={updating} disabled={!newStatus}>Confirm Update</Btn>
           </div>
@@ -286,10 +329,10 @@ export default function IncidentDetail() {
 
       {/* Delete confirm modal */}
       <Modal open={deleteModal} onClose={() => setDeleteModal(false)} title="Delete Incident">
-        <p style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:20 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
           Are you sure you want to delete this incident? This action cannot be undone.
         </p>
-        <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <Btn variant="secondary" onClick={() => setDeleteModal(false)}>Cancel</Btn>
           <Btn variant="danger" onClick={handleDelete} loading={deleting}>Delete Incident</Btn>
         </div>
