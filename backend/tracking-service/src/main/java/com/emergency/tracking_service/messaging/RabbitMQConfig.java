@@ -19,6 +19,8 @@ public class RabbitMQConfig {
 
     // ─── Routing keys (publisher) ─────────────────────────────────────────────
     public static final String RK_VEHICLE_LOCATION_PREFIX = "vehicle.location.";
+    public static final String RK_VEHICLE_ON_SCENE        = "vehicle.on_scene";
+    public static final String RK_VEHICLE_RETURNED        = "vehicle.returned";
 
     // ─── Queue names (consumer) ───────────────────────────────────────────────
     public static final String Q_DISPATCH = "q.dts.incident.dispatch";

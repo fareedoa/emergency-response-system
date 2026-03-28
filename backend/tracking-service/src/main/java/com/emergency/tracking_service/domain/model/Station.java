@@ -1,68 +1,44 @@
 package com.emergency.tracking_service.domain.model;
 
 import com.emergency.tracking_service.domain.enums.StationType;
-import com.emergency.tracking_service.domain.enums.VehicleStatus;
-import com.emergency.tracking_service.domain.enums.VehicleType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "vehicles")
+@Table(name = "stations")
+@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Vehicle {
+public class Station {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "registration", unique = true, nullable = false)
-    private String registration;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "vehicle_type", nullable = false)
-    private VehicleType vehicleType;
-
-    @Column(name = "station_id", nullable = false)
-    private UUID stationId;
+    @Column(name = "name", nullable = false)
+    private String name;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "station_type", nullable = false)
     private StationType stationType;
 
-    @Column(name = "driver_user_id")
-    private UUID driverUserId;
+    @Column(name = "latitude", nullable = false)
+    private Double latitude;
 
-    @Column(name = "current_lat")
-    private Double currentLat;
-
-    @Column(name = "current_lng")
-    private Double currentLng;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    @Builder.Default
-    private VehicleStatus status = VehicleStatus.IDLE;
-
-    @Column(name = "active_incident_id")
-    private String activeIncidentId;
-
-    @Column(name = "dest_lat")
-    private Double destinationLat;
-
-    @Column(name = "dest_lng")
-    private Double destinationLng;
+    @Column(name = "longitude", nullable = false)
+    private Double longitude;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

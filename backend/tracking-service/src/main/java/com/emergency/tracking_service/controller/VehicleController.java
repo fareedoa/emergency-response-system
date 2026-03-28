@@ -42,6 +42,20 @@ public class VehicleController {
         return ResponseEntity.ok(vehicleService.getAllVehicles());
     }
 
+    /**
+     * Internal endpoint called by incident-service to find IDLE vehicles for auto-dispatch.
+     * No auth required — this is an internal service-to-service call.
+     *
+     * @param vehicleTypes comma-separated list of VehicleType names (e.g. "AMBULANCE" or "POLICE_CAR,PATROL_BIKE").
+     *                     If omitted, all IDLE vehicles are returned.
+     */
+    @GetMapping("/available")
+    @Operation(summary = "Get available (IDLE) vehicles", description = "Used by incident-service for nearest-vehicle dispatch.")
+    public ResponseEntity<List<VehicleResponse>> getAvailableVehicles(
+            @RequestParam(required = false) String vehicleTypes) {
+        return ResponseEntity.ok(vehicleService.getAvailableVehicles(vehicleTypes));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'HOSPITAL_ADMIN', 'POLICE_ADMIN', 'FIRE_ADMIN')")
     @Operation(summary = "Get vehicle by ID", description = "Retrieves details of a specific vehicle.")

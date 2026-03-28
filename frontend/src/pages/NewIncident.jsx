@@ -214,7 +214,7 @@ export default function NewIncident() {
               </p>
 
               {/* Geocoder search */}
-              <form onSubmit={handleSearch} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 <div style={{ position: 'relative', flex: 1 }}>
                   <Navigation size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                   <input
@@ -223,10 +223,11 @@ export default function NewIncident() {
                     style={{ width: '100%', background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-sm)', padding: '9px 12px 9px 34px', color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
                     onFocus={e => e.target.style.borderColor = 'var(--color-brand)'}
                     onBlur={e => e.target.style.borderColor = 'var(--border-subtle)'}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(e); } }}
                   />
                 </div>
-                <Btn type="submit" size="sm" loading={searching}>Search</Btn>
-              </form>
+                <Btn type="button" size="sm" loading={searching} onClick={handleSearch}>Search</Btn>
+              </div>
 
               {/* Map */}
               <div style={{ borderRadius: 'var(--r-md)', overflow: 'hidden', border: '1px solid var(--border-subtle)', height: 320 }}>

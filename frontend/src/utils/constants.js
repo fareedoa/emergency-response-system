@@ -1,6 +1,6 @@
 import {
   HeartPulse, Flame, ShieldAlert, AlertTriangle,
-  Car, FileQuestion, Ambulance, Shield, Bike, Truck
+  Car, FileQuestion, Ambulance, Shield, Bike, Truck, Hospital
 } from 'lucide-react';
 
 // ── Incident Types (matches IncidentType.java) ───────────────────────────
@@ -56,9 +56,9 @@ export const VEHICLE_STATUSES = [
 
 // ── Station Types ─────────────────────────────────────────────────────────
 export const STATION_TYPES = [
-  { value: 'HOSPITAL',       label: 'Hospital' },
-  { value: 'POLICE_STATION', label: 'Police Station' },
-  { value: 'FIRE_STATION',   label: 'Fire Station' },
+  { value: 'HOSPITAL',       label: 'Hospital',       Icon: Hospital },
+  { value: 'POLICE_STATION', label: 'Police Station', Icon: Shield   },
+  { value: 'FIRE_STATION',   label: 'Fire Station',   Icon: Flame    },
 ];
 
 // ── User Roles (matches Role.java) ───────────────────────────────────────

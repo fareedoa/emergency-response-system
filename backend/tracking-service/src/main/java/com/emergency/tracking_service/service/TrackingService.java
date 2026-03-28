@@ -71,10 +71,26 @@ public class TrackingService {
 
         VehicleLocationResponse response = toResponse(locationRecord);
 
-        // 2. Broadcast via WebSocket
-        messagingTemplate.convertAndSend("/topic/vehicles/" + vehicleId, response);
+        // 2. Broadcast via WebSocket — enriched with vehicleType + status for frontend icons/badges
+        VehicleLocationResponse enriched = VehicleLocationResponse.builder()
+                .vehicleId(vehicleId)
+                .registration(vehicle.getRegistration())
+                .vehicleType(vehicle.getVehicleType() != null ? vehicle.getVehicleType().name() : null)
+                .vehicleStatus(vehicle.getStatus() != null ? vehicle.getStatus().name() : null)
+                .incidentId(locationRecord.getIncidentId())
+                .latitude(locationRecord.getLatitude())
+                .longitude(locationRecord.getLongitude())
+                .speedKmh(response.getSpeedKmh())
+                .heading(response.getHeading())
+                .recordedAt(response.getRecordedAt())
+                .build();
+
+        // Global topic — Live Tracking page (Tracking.jsx subscribes here)
+        messagingTemplate.convertAndSend("/topic/location-updates", enriched);
+        // Per-vehicle topic — IncidentDetail.jsx uses this for a specific dispatched vehicle
+        messagingTemplate.convertAndSend("/topic/vehicles/" + vehicleId, enriched);
         if (locationRecord.getIncidentId() != null) {
-            messagingTemplate.convertAndSend("/topic/incidents/" + locationRecord.getIncidentId() + "/tracking", response);
+            messagingTemplate.convertAndSend("/topic/incidents/" + locationRecord.getIncidentId() + "/tracking", enriched);
         }
 
         // 3. Publish to RabbitMQ: vehicle.location.<vehicleId>

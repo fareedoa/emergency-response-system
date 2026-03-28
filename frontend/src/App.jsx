@@ -15,6 +15,7 @@ import Vehicles from './pages/Vehicles';
 import Analytics from './pages/Analytics';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Facilities from './pages/Facilities';
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
               } />
               <Route path="/incidents/:id" element={<IncidentDetail />} />
               <Route path="/tracking"     element={<Tracking />} />
+              <Route path="/facilities"   element={<Facilities />} />
               <Route path="/vehicles"     element={<Vehicles />} />
               <Route path="/analytics"    element={<Analytics />} />
               <Route path="/users" element={

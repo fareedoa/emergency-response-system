@@ -78,7 +78,7 @@ export const incidentApi = {
   listOpen:         ()                  => incidentHttp.get('/incidents/open'),
   get:              (id)                => incidentHttp.get(`/incidents/${id}`),
   updateStatus:     (id, status)        => incidentHttp.put(`/incidents/${id}/status`, { status }),
-  assign:           (id, responderId)   => incidentHttp.put(`/incidents/${id}/assign`, { responderId }),
+  assign:           (id, unitId)        => incidentHttp.put(`/incidents/${id}/assign`, { unitId }),
   delete:           (id)                => incidentHttp.delete(`/incidents/${id}`),
   timeline:         (id)                => incidentHttp.get(`/incidents/${id}/timeline`),
   notes:            (id)                => incidentHttp.get(`/incidents/${id}/notes`),
@@ -93,6 +93,10 @@ export const trackingApi = {
   getLocation:     (id)               => trackingHttp.get(`/vehicles/${id}/location`),
   updateLocation:  (id, lat, lng)     => trackingHttp.put(`/vehicles/${id}/location`, { latitude: lat, longitude: lng }),
   updateStatus:    (id, status)       => trackingHttp.put(`/vehicles/${id}/status`, { status }),
+  createStation:   (body)             => trackingHttp.post('/stations', body),
+  listStations:    ()                 => trackingHttp.get('/stations'),
+  getStation:      (id)               => trackingHttp.get(`/stations/${id}`),
+  deleteStation:   (id)               => trackingHttp.delete(`/stations/${id}`),
 };
 
 // ── Analytics Service (port 8084) ─────────────────────────────────────────

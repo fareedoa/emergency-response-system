@@ -20,7 +20,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // The endpoint clients will connect to
-        registry.addEndpoint("/ws-tracking").setAllowedOriginPatterns("*").withSockJS();
+        // Plain WebSocket endpoint — no SockJS wrapper.
+        // Frontend connects to: ws://localhost:8083/ws-tracking/websocket
+        registry.addEndpoint("/ws-tracking/websocket").setAllowedOriginPatterns("*").withSockJS();;
     }
 }

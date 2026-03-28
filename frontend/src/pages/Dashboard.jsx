@@ -86,10 +86,14 @@ export default function Dashboard() {
   const totalByType = incidents.length;
 
   // KPI values: prefer analytics summary, fall back to computed
-  const totalToday = kpi?.totalIncidentsToday ?? incidents.length;
-  const openCount  = kpi?.openIncidents ?? openIncidents.length;
-  const avgResp    = kpi?.averageResponseTimeSeconds ? `${Math.round(kpi.averageResponseTimeSeconds / 60)}m` : '—';
+  const totalToday  = kpi?.totalIncidentsToday ?? incidents.length;
+  const openCount   = kpi?.openIncidents ?? openIncidents.length;
   const activeUnits = kpi?.activeUnits ?? activeVehicles.length;
+
+  const resolvedCount = incidents.filter(i => i.status === 'RESOLVED').length;
+  const avgResp = kpi?.averageResponseTimeSeconds
+    ? `${Math.round(kpi.averageResponseTimeSeconds / 60)}m`
+    : resolvedCount;
 
   if (loading && incidents.length === 0) return <Spinner />;
 
@@ -124,7 +128,7 @@ export default function Dashboard() {
         <StatCard label="Incidents Today"   value={totalToday}  color="var(--color-brand)"    icon={<Activity size={18} />} />
         <StatCard label="Open"              value={openCount}   color="var(--color-danger)"   icon={<AlertTriangle size={18} />} />
         <StatCard label="Active Units"      value={activeUnits} color="var(--color-dispatch)" icon={<Truck size={18} />} />
-        <StatCard label="Avg Response"      value={avgResp}     color="var(--color-success)"  icon={<CheckCircle size={18} />} sub="RESOLVED incidents" />
+        <StatCard label={kpi?.averageResponseTimeSeconds ? 'Avg Response' : 'Resolved'} value={avgResp} color="var(--color-success)" icon={<CheckCircle size={18} />} sub={kpi?.averageResponseTimeSeconds ? 'avg to dispatch' : 'total resolved'} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>

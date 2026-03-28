@@ -14,6 +14,7 @@ const NAV = [
   { to: '/incidents',     label: 'Incidents',      Icon: AlertTriangle,   roles: null },
   { to: '/incidents/new', label: 'Log Incident',   Icon: Plus,            roles: ['SYSTEM_ADMIN','HOSPITAL_ADMIN','POLICE_ADMIN','FIRE_ADMIN'], highlight: true },
   { to: '/tracking',      label: 'Live Tracking',  Icon: Navigation,      roles: null },
+  { to: '/facilities',    label: 'Facilities',     Icon: Activity,        roles: ['SYSTEM_ADMIN','HOSPITAL_ADMIN','POLICE_ADMIN','FIRE_ADMIN'] },
   { to: '/vehicles',      label: 'Fleet',          Icon: Truck,           roles: null },
   { to: '/analytics',     label: 'Analytics',      Icon: BarChart2,       roles: null },
   { to: '/users',         label: 'Users',          Icon: Users,           roles: ['SYSTEM_ADMIN'] },

@@ -20,5 +20,7 @@ public class IncidentStatusChangedEvent {
     private IncidentStatus newStatus;
     /** UUID of the responder unit assigned to this incident */
     private UUID assignedUnit;
+    private Double destinationLat;
+    private Double destinationLng;
     private LocalDateTime changedAt;
 }

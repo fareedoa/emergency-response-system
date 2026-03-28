@@ -18,5 +18,7 @@ public class IncidentStatusChangedEvent {
     private IncidentStatus previousStatus;
     private IncidentStatus newStatus;
     private UUID assignedUnit;
+    private Double destinationLat;
+    private Double destinationLng;
     private LocalDateTime changedAt;
 }

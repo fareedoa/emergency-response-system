@@ -66,6 +66,10 @@ public class Incident {
     @Column(name = "assigned_unit")
     private UUID assignedUnit;
 
+    /** Set for MEDICAL_EMERGENCY incidents: the nearest hospital with available beds. */
+    @Column(name = "hospital_id")
+    private String hospitalId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default

@@ -45,6 +45,9 @@ public class IncidentResponse {
     @Schema(description = "UUID of the responder unit assigned to this incident")
     private UUID assignedUnit;
 
+    @Schema(description = "Nearest hospital ID (set for MEDICAL_EMERGENCY incidents)")
+    private String hospitalId;
+
     @Schema(description = "Current incident status")
     private IncidentStatus status;
 

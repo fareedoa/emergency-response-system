@@ -34,11 +34,13 @@ public class IncidentDispatchListener {
 
         vehicleRepository.findById(event.getAssignedUnit()).ifPresentOrElse(
                 vehicle -> {
-                    vehicle.setStatus(VehicleStatus.DISPATCHED);
+                    vehicle.setStatus(VehicleStatus.EN_ROUTE);
                     vehicle.setActiveIncidentId(event.getIncidentId().toString());
+                    vehicle.setDestinationLat(event.getDestinationLat());
+                    vehicle.setDestinationLng(event.getDestinationLng());
                     vehicleRepository.save(vehicle);
-                    log.info("Vehicle {} set to DISPATCHED for incident {}",
-                            vehicle.getRegistration(), event.getIncidentId());
+                    log.info("Vehicle {} set to EN_ROUTE for incident {} at ({}, {})",
+                            vehicle.getRegistration(), event.getIncidentId(), event.getDestinationLat(), event.getDestinationLng());
                 },
                 () -> log.warn("Vehicle not found for assignedUnit={}", event.getAssignedUnit())
         );

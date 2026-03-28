@@ -46,7 +46,9 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/v3/api-docs/**",
                     "/v3/api-docs",
-                    "/actuator/**"
+                    "/actuator/**",
+                    "/ws-tracking/**",     // WebSocket upgrade handshakes are plain HTTP
+                    "/vehicles/available"  // Internal service-to-service dispatch query
                 ).permitAll()
                 .anyRequest().authenticated()
             )

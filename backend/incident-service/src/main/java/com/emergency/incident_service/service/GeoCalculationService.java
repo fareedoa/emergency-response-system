@@ -16,7 +16,8 @@ public class GeoCalculationService {
                  + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                  * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        // Haversine: d = 2r * arcsin( sqrt(a) )
+        double c = 2 * Math.asin(Math.sqrt(a));
 
         return EARTH_RADIUS_KM * c;
     }

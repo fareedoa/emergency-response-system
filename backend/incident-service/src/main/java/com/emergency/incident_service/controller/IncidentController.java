@@ -1,6 +1,6 @@
 package com.emergency.incident_service.controller;
 
-import com.emergency.incident_service.dto.AssignResponderRequest;
+import com.emergency.incident_service.dto.AssignUnitRequest;
 import com.emergency.incident_service.dto.CreateIncidentRequest;
 import com.emergency.incident_service.dto.IncidentResponse;
 import com.emergency.incident_service.dto.UpdateStatusRequest;
@@ -126,19 +126,6 @@ public class IncidentController {
     }
 
     /**
-     * GET /incidents/:id/responders/nearest
-     */
-    @GetMapping("/{id}/responders/nearest")
-    @PreAuthorize(HAS_ANY_ADMIN_ROLE)
-    @Operation(
-        summary = "Get nearest responders",
-        description = "Finds and returns the nearest available responder based on the incident type and location."
-    )
-    public ResponseEntity<com.emergency.incident_service.domain.model.Responder> getNearestResponder(@PathVariable UUID id) {
-        return ResponseEntity.ok(incidentService.getNearestResponderForIncident(id));
-    }
-
-    /**
      * GET /incidents/:id/timeline
      */
     @GetMapping("/{id}/timeline")
@@ -175,7 +162,7 @@ public class IncidentController {
     @PutMapping("/{id}/assign")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(
-        summary = "Manually assign a responder",
+        summary = "Manually assign a responder/unit",
         description = """
             Overrides the auto-dispatched responder. 
             The previously assigned responder (if any) is freed and the new one is marked unavailable.
@@ -185,7 +172,7 @@ public class IncidentController {
     )
     public ResponseEntity<IncidentResponse> assignResponder(
             @PathVariable UUID id,
-            @Valid @RequestBody AssignResponderRequest request) {
+            @Valid @RequestBody AssignUnitRequest request) {
         return ResponseEntity.ok(incidentService.assignResponder(id, request));
     }
 }

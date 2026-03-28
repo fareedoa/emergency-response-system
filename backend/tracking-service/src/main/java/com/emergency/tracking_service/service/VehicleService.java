@@ -1,5 +1,7 @@
 package com.emergency.tracking_service.service;
 
+import com.emergency.tracking_service.domain.enums.VehicleStatus;
+import com.emergency.tracking_service.domain.enums.VehicleType;
 import com.emergency.tracking_service.domain.model.Vehicle;
 import com.emergency.tracking_service.dto.RegisterVehicleRequest;
 import com.emergency.tracking_service.dto.VehicleResponse;
@@ -8,6 +10,7 @@ import com.emergency.tracking_service.repository.VehicleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -28,6 +31,8 @@ public class VehicleService {
                 .vehicleType(request.getVehicleType())
                 .stationId(request.getStationId())
                 .stationType(request.getStationType())
+                .currentLat(request.getLatitude())
+                .currentLng(request.getLongitude())
                 .build();
 
         return toResponse(vehicleRepository.save(vehicle));
@@ -45,6 +50,26 @@ public class VehicleService {
         return vehicleRepository.findAll().stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns IDLE vehicles whose type matches any of the given comma-separated type names.
+     * If {@code vehicleTypes} is blank, returns all IDLE vehicles.
+     * Used by the incident-service to find the nearest available vehicle for dispatch.
+     */
+    @Transactional(readOnly = true)
+    public List<VehicleResponse> getAvailableVehicles(String vehicleTypes) {
+        List<Vehicle> vehicles;
+        if (vehicleTypes == null || vehicleTypes.isBlank()) {
+            vehicles = vehicleRepository.findByStatus(VehicleStatus.IDLE);
+        } else {
+            List<VehicleType> types = Arrays.stream(vehicleTypes.split(","))
+                    .map(String::trim)
+                    .map(VehicleType::valueOf)
+                    .collect(Collectors.toList());
+            vehicles = vehicleRepository.findByStatusAndVehicleTypeIn(VehicleStatus.IDLE, types);
+        }
+        return vehicles.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     private VehicleResponse toResponse(Vehicle vehicle) {

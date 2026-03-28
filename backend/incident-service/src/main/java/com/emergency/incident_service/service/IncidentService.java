@@ -2,8 +2,7 @@ package com.emergency.incident_service.service;
 
 import com.emergency.incident_service.domain.enums.IncidentStatus;
 import com.emergency.incident_service.domain.model.Incident;
-import com.emergency.incident_service.domain.model.Responder;
-import com.emergency.incident_service.dto.AssignResponderRequest;
+import com.emergency.incident_service.dto.AssignUnitRequest;
 import com.emergency.incident_service.dto.CreateIncidentRequest;
 import com.emergency.incident_service.dto.IncidentResponse;
 import com.emergency.incident_service.dto.UpdateStatusRequest;
@@ -80,19 +79,23 @@ public class IncidentService {
         // Publish incident.created event
         publishCreatedEvent(incident);
 
-        // Auto-dispatch: find nearest available responder
+        // Auto-dispatch: find nearest IDLE vehicle from tracking-service
         try {
-            Responder nearest = dispatchService.findNearestAvailableResponder(
+            UUID vehicleId = dispatchService.findNearestAvailableVehicle(
                     request.getIncidentType(),
                     request.getLatitude(),
                     request.getLongitude());
 
-            // Mark responder unavailable and link to incident
-            nearest.setAvailable(false);
-            responderRepository.save(nearest);
-
-            incident.setAssignedUnit(nearest.getId());
+            incident.setAssignedUnit(vehicleId);
             incident.setStatus(IncidentStatus.DISPATCHED);
+
+            // MEDICAL_EMERGENCY edge-case: also select nearest hospital with capacity
+            if (request.getIncidentType() == com.emergency.incident_service.domain.enums.IncidentType.MEDICAL_EMERGENCY) {
+                dispatchService.findNearestHospitalWithBeds(
+                        request.getLatitude(), request.getLongitude())
+                        .ifPresent(incident::setHospitalId);
+            }
+
             incident = incidentRepository.save(incident);
 
             // Publish incident.dispatched event
@@ -149,17 +152,6 @@ public class IncidentService {
     public String getIncidentNotes(UUID id) {
         Incident incident = findOrThrow(id);
         return incident.getNotes() != null ? incident.getNotes() : "";
-    }
-
-    /** GET /incidents/:id/responders/nearest */
-    @Transactional(readOnly = true)
-    public Responder getNearestResponderForIncident(UUID id) {
-        Incident incident = findOrThrow(id);
-        return dispatchService.findNearestAvailableResponder(
-                incident.getIncidentType(),
-                incident.getLatitude(),
-                incident.getLongitude()
-        );
     }
 
     /** GET /incidents/:id/timeline */
@@ -231,17 +223,12 @@ public class IncidentService {
 
     /** PUT /incidents/:id/assign – manual override */
     @Transactional
-    public IncidentResponse assignResponder(UUID id, AssignResponderRequest request) {
+    public IncidentResponse assignResponder(UUID id, AssignUnitRequest request) {
         Incident incident = findOrThrow(id);
         IncidentStatus previousStatus = incident.getStatus();
 
-        Responder responder = responderRepository.findById(request.getResponderId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Responder not found with ID: " + request.getResponderId()));
-
         // Release previously assigned responder if any
-        if (incident.getAssignedUnit() != null
-                && !incident.getAssignedUnit().equals(request.getResponderId())) {
+        if (incident.getAssignedUnit() != null) {
             responderRepository.findById(incident.getAssignedUnit())
                     .ifPresent(prev -> {
                         prev.setAvailable(true);
@@ -249,10 +236,7 @@ public class IncidentService {
                     });
         }
 
-        responder.setAvailable(false);
-        responderRepository.save(responder);
-
-        incident.setAssignedUnit(responder.getId());
+        incident.setAssignedUnit(request.getUnitId());
         incident.setStatus(IncidentStatus.DISPATCHED);
 
         Incident saved = incidentRepository.save(incident);
@@ -300,6 +284,8 @@ public class IncidentService {
                     .previousStatus(previousStatus)
                     .newStatus(newStatus)
                     .assignedUnit(incident.getAssignedUnit())
+                    .destinationLat(incident.getLatitude())
+                    .destinationLng(incident.getLongitude())
                     .changedAt(LocalDateTime.now())
                     .build();
             rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, routingKey, event);
@@ -328,6 +314,7 @@ public class IncidentService {
                 .notes(i.getNotes())
                 .createdBy(i.getCreatedBy())
                 .assignedUnit(i.getAssignedUnit())
+                .hospitalId(i.getHospitalId())
                 .status(i.getStatus())
                 .createdAt(i.getCreatedAt())
                 .build();

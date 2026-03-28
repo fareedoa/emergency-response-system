@@ -271,9 +271,9 @@ export function Modal({ open, onClose, title, children, maxWidth = 520 }) {
   if (!open) return null;
   return (
     <div onClick={e => e.target === e.currentTarget && onClose?.()} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'fadeIn 0.2s ease' }}>
-      <div ref={ref} tabIndex={-1} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-normal)', borderRadius: 'var(--r-xl)', padding: 24, width: '100%', maxWidth, boxShadow: 'var(--shadow-xl)', outline: 'none', animation: 'fadeUp 0.25s ease', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, var(--color-brand), transparent)' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div ref={ref} tabIndex={-1} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-normal)', borderRadius: 'var(--r-xl)', width: '100%', maxWidth, maxHeight: 'calc(100vh - 40px)', boxShadow: 'var(--shadow-xl)', outline: 'none', animation: 'fadeUp 0.25s ease', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, var(--color-brand), transparent)', zIndex: 1 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 24px 20px', flexShrink: 0 }}>
           <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 800 }}>{title}</h3>
           <button onClick={onClose} style={{ color: 'var(--text-muted)', display: 'flex', padding: 4, borderRadius: 'var(--r-sm)' }}
             onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-raised)'; }}
@@ -281,7 +281,9 @@ export function Modal({ open, onClose, title, children, maxWidth = 520 }) {
             <X size={16} strokeWidth={2} />
           </button>
         </div>
-        {children}
+        <div style={{ overflowY: 'auto', padding: '0 24px 24px', flex: 1 }}>
+          {children}
+        </div>
       </div>
     </div>
   );

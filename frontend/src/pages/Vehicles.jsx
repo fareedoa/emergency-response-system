@@ -3,12 +3,8 @@ import { trackingApi } from '../api';
 import { PageHeader, Card, DataTable, SectionTitle, Btn, VehicleStatusBadge, Modal, Field, Input, Select, VehicleIcon, Spinner } from '../components/UI';
 import { VEHICLE_TYPES, VEHICLE_STATUSES, VEHICLE_STATUS_COLORS, STATION_TYPES, ROLE_STATION } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
+import { Plus, Truck, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-
-
-
-
 
 export default function Vehicles() {
   const { user } = useAuth();
@@ -19,21 +15,23 @@ export default function Vehicles() {
   const [filterStatus, setFilterStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ registration: '', vehicleType: '', stationType: '', latitude: '', longitude: '' });
+  const [form, setForm] = useState({ registration: '', vehicleType: '', stationId: '', stationType: '', latitude: '', longitude: '' });
+
+  const [stations, setStations] = useState([]);
 
   const load = useCallback(() => {
     setLoading(true);
-    trackingApi.listVehicles()
-      .then(r => {
-        const all = r.data || [];
+    Promise.all([trackingApi.listVehicles(), trackingApi.listStations().catch(() => ({data:[]}))])
+      .then(([vRes, sRes]) => {
+        const all = vRes.data || [];
         setVehicles(stationFilter ? all.filter(v => v.stationType === stationFilter) : all);
+        setStations(sRes.data || []);
       })
-      .catch(() => toast.error('Failed to load vehicles'))
+      .catch(() => toast.error('Failed to load data'))
       .finally(() => setLoading(false));
   }, [stationFilter]);
 
   useEffect(() => { load(); }, [load]);
-
 
   const filtered = vehicles.filter(v =>
     (!filterType || v.vehicleType === filterType) &&
@@ -51,7 +49,6 @@ export default function Vehicles() {
 
   const handleRegister = async () => {
     if (!form.registration || !form.vehicleType || !form.stationType) { toast.error('Registration, type, and station are required'); return; }
-    // Enforce XX-0000-00 or X-0000-00 format
     if (!/^[A-Z]{1,2}-\d{1,4}-\d{2}$/.test(form.registration)) {
       toast.error('Registration must match format: GR-1234-22');
       return;
@@ -60,13 +57,13 @@ export default function Vehicles() {
     try {
       await trackingApi.registerVehicle({
         registration: form.registration, vehicleType: form.vehicleType,
-        stationType: form.stationType,
+        stationId: form.stationId, stationType: form.stationType,
         latitude: parseFloat(form.latitude) || 5.55,
         longitude: parseFloat(form.longitude) || -0.21,
       });
       toast.success('Vehicle registered');
       setModalOpen(false);
-      setForm({ registration:'', vehicleType:'', stationType:'', latitude:'', longitude:'' });
+      setForm({ registration:'', vehicleType:'', stationId:'', stationType:'', latitude:'', longitude:'' });
       trackingApi.listVehicles().then(r => { if (r.data?.length) setVehicles(r.data); }).catch(() => {});
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed');
@@ -84,7 +81,10 @@ export default function Vehicles() {
     { key:'vehicleType',  label:'Type', w:60, render: v => <VehicleIcon type={v} size={18} /> },
     { key:'registration', label:'Registration',        render: (v) => <span style={{ fontFamily:'var(--font-mono)', fontWeight:600, fontSize:13 }}>{v}</span> },
     { key:'vehicleType',  label:'Class',         w:140, sortable:false, render: v => <span style={{ fontSize:12,color:'var(--text-secondary)' }}>{v?.replace('_',' ')}</span> },
-    { key:'stationType',  label:'Station',       w:160, render: v => <span style={{ fontSize:12, color:'var(--text-secondary)' }}>{v?.replace('_', ' ')}</span> },
+    { key:'stationId',    label:'Station',       w:160, render: (v, r) => {
+        const st = stations.find(s => s.id === v);
+        return <span style={{ fontSize:12, color:'var(--text-secondary)' }}>{st ? st.name : r.stationType?.replace('_', ' ')}</span>
+    } },
     { key:'status',       label:'Status',        w:130, render: v => <VehicleStatusBadge status={v} /> },
     { key:'currentLat',   label:'GPS',           w:170, sortable:false, render:(v, r) => (
       <span style={{ fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-muted)' }}>
@@ -93,12 +93,14 @@ export default function Vehicles() {
     )},
   ];
 
+  const selectedStation = stations.find(s => s.id === form.stationId);
+
   return (
     <div style={{ animation:'fadeUp 0.3s ease' }}>
       <PageHeader
         title="Fleet Management"
         subtitle={`${vehicles.length} registered vehicles`}
-        actions={<Btn onClick={() => setModalOpen(true)} icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>}>Register Vehicle</Btn>}
+        actions={<Btn onClick={() => setModalOpen(true)} icon={<Plus size={13} />}>Register Vehicle</Btn>}
       />
 
       {/* Summary cards */}
@@ -108,7 +110,9 @@ export default function Vehicles() {
             onClick={() => setFilterType(filterType === t.value ? '' : t.value)}
             glowColor={filterType === t.value ? 'var(--color-brand)' : undefined}
           >
-            <div style={{ fontSize:28, marginBottom:8 }}>{t.icon}</div>
+            <div style={{ marginBottom:8, color:'var(--color-brand)' }}>
+              {t.Icon && <t.Icon size={26} strokeWidth={1.6} />}
+            </div>
             <div style={{ fontFamily:'var(--font-display)', fontSize:24, fontWeight:800, color:'var(--color-brand)' }}>{typeCounts[t.value] || 0}</div>
             <div style={{ fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em', marginTop:3 }}>{t.label}</div>
             {filterType === t.value && <div style={{ position:'absolute', bottom:0, left:0, right:0, height:2, background:'var(--color-brand)' }} />}
@@ -151,7 +155,7 @@ export default function Vehicles() {
       </div>
 
       <Card style={{ padding:0 }}>
-        <DataTable cols={cols} rows={filtered} emptyTitle="No vehicles found" emptyIcon="🚗" />
+        <DataTable cols={cols} rows={filtered} emptyTitle="No vehicles found" emptyIcon={<Truck size={40} />} />
       </Card>
 
       {/* Register modal */}
@@ -163,23 +167,49 @@ export default function Vehicles() {
           <Field label="Vehicle Type" required>
             <Select value={form.vehicleType} onChange={e => setForm(p => ({...p, vehicleType: e.target.value}))}>
               <option value="">Select type...</option>
-              {VEHICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+              {VEHICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </Select>
           </Field>
-          <Field label="Assigned Station" required>
-            <Select value={form.stationType} onChange={e => setForm(p => ({...p, stationType: e.target.value}))}>
-              <option value="">Select station type...</option>
-              {STATION_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <Field label="Assigned Station / Facility" required>
+            <Select value={form.stationId || ''} onChange={e => {
+              const st = stations.find(s => s.id === e.target.value);
+              setForm(p => ({
+                ...p,
+                stationId: e.target.value,
+                stationType: st?.stationType || '',
+                latitude: st?.latitude != null ? String(st.latitude) : '',
+                longitude: st?.longitude != null ? String(st.longitude) : '',
+              }));
+            }}>
+              <option value="">Select facility...</option>
+              {stations.filter(s => !stationFilter || s.stationType === stationFilter).map(s => (
+                <option key={s.id} value={s.id}>{s.name} ({s.stationType?.replace('_',' ')})</option>
+              ))}
             </Select>
           </Field>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <Field label="Starting Latitude">
-              <Input type="number" value={form.latitude} onChange={e => setForm(p => ({...p, latitude: e.target.value}))} placeholder="e.g. 5.6037" step="any" />
-            </Field>
-            <Field label="Starting Longitude">
-              <Input type="number" value={form.longitude} onChange={e => setForm(p => ({...p, longitude: e.target.value}))} placeholder="e.g. -0.1870" step="any" />
-            </Field>
-          </div>
+
+          {/* Location — auto-filled from station or manual */}
+          {selectedStation ? (
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:'var(--r-sm)', background:'color-mix(in srgb, var(--color-brand) 8%, transparent)', border:'1px solid color-mix(in srgb, var(--color-brand) 25%, transparent)' }}>
+              <MapPin size={14} color="var(--color-brand)" style={{ flexShrink:0 }} />
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--color-brand)', marginBottom:2 }}>LOCATION FROM STATION</div>
+                <div style={{ fontFamily:'var(--font-mono)', fontSize:12, color:'var(--text-secondary)' }}>
+                  {parseFloat(form.latitude).toFixed(5)}, {parseFloat(form.longitude).toFixed(5)}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <Field label="Starting Latitude">
+                <Input type="number" value={form.latitude} onChange={e => setForm(p => ({...p, latitude: e.target.value}))} placeholder="e.g. 5.6037" step="any" />
+              </Field>
+              <Field label="Starting Longitude">
+                <Input type="number" value={form.longitude} onChange={e => setForm(p => ({...p, longitude: e.target.value}))} placeholder="e.g. -0.1870" step="any" />
+              </Field>
+            </div>
+          )}
+
           <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8, borderTop:'1px solid var(--border-faint)', paddingTop:16 }}>
             <Btn variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Btn>
             <Btn onClick={handleRegister} loading={saving}>Register</Btn>
