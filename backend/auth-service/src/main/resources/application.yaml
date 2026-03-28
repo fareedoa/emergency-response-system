@@ -28,6 +28,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:true} # <--- ADD THIS (true for cloud, false for local)
       timeout: 10000
       database: 0
 

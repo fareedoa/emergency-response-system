@@ -9,12 +9,12 @@ spring:
     incident:
       jdbc-url: ${INCIDENT_DB_URL:${DATABASE_URL_INCIDENT}}
       username: ${DATABASE_USERNAME}
-      password: ${DATABASE_PASSWORD}
+      password: ${INCIDENT_DB_PASSWORD}
       driver-class-name: org.postgresql.Driver
     tracking:
       jdbc-url: ${TRACKING_DB_URL:${DATABASE_URL_TRACKING}}
       username: ${DATABASE_USERNAME}
-      password: ${DATABASE_PASSWORD}
+      password: ${TRACKING_DB_PASSWORD}
       driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -33,12 +33,20 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:true} # <--- ADD THIS (true for cloud, false for local)
+      timeout: 10000
+      database: 0
 
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
+    port: ${RABBITMQ_PORT:5671}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    ssl:
+      enabled: ${RABBITMQ_SSL_ENABLED:true}
+      virtual-host: ${RABBITMQ_VHOST:/}
     listener:
       simple:
         acknowledge-mode: auto
