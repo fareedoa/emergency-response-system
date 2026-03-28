@@ -44,8 +44,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 UserProfileResponse profile = authServiceClient.getProfile("Bearer " + jwt);
 
                 // Construct the role authority (auth-service returns 'SYSTEM_ADMIN' without
-                // ROLE_ prefix usually,
-                // but let's ensure it has ROLE_ for Spring Security)
+                // ROLE_ prefix usually, but let's ensure it has ROLE_ for Spring Security)
                 String role = profile.getRole();
                 if (role != null && !role.startsWith("ROLE_")) {
                     role = "ROLE_" + role;
@@ -70,13 +69,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
         }
-        
+
         // Also check query parameter for WebSocket connections
         String tokenParam = request.getParameter("token");
         if (StringUtils.hasText(tokenParam)) {
             return tokenParam;
         }
-        
+
         return null;
     }
 }

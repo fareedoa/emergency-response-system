@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { incidentApi } from '../api';
 import { PageHeader, Btn, Card, Field, Input, Select, Textarea, SectionTitle } from '../components/UI';
-import { INCIDENT_TYPES, SEVERITY_LEVELS, getTypeInfo } from '../utils/constants';
+import { INCIDENT_TYPES, SEVERITY_LEVELS, ROLE_INCIDENT_TYPES, getTypeInfo } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import { Navigation, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -54,6 +54,8 @@ async function geocodeNominatim(query) {
 export default function NewIncident() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const allowedTypes = ROLE_INCIDENT_TYPES[user?.role] ?? null;
+  const visibleTypes = allowedTypes ? INCIDENT_TYPES.filter(t => allowedTypes.includes(t.value)) : INCIDENT_TYPES;
 
   const [form, setForm] = useState({
     citizenName: '', incidentType: '', otherIncidentType: '', severity: '', latitude: '', longitude: '', notes: '',
@@ -145,7 +147,7 @@ export default function NewIncident() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <Field label="Incident Type" required error={errors.incidentType}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                    {INCIDENT_TYPES.map(type => {
+                    {visibleTypes.map(type => {
                       const TypeIcon = type.Icon;
                       const isSelected = form.incidentType === type.value;
                       return (

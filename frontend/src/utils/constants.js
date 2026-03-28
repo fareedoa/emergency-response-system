@@ -69,6 +69,22 @@ export const USER_ROLES = [
   { value: 'FIRE_ADMIN',     label: 'Fire Administrator' },
 ];
 
+// ── Role → allowed incident types (null = see all) ───────────────────────
+export const ROLE_INCIDENT_TYPES = {
+  SYSTEM_ADMIN:   null,
+  HOSPITAL_ADMIN: ['MEDICAL_EMERGENCY', 'ACCIDENT', 'OTHER'],
+  POLICE_ADMIN:   ['ROBBERY', 'CRIME', 'OTHER'],
+  FIRE_ADMIN:     ['FIRE', 'OTHER'],
+};
+
+// ── Role → allowed vehicle types (null = see all) ────────────────────────
+export const ROLE_VEHICLE_TYPES = {
+  SYSTEM_ADMIN:   null,
+  HOSPITAL_ADMIN: ['AMBULANCE'],
+  POLICE_ADMIN:   ['POLICE_CAR', 'PATROL_BIKE'],
+  FIRE_ADMIN:     ['FIRE_TRUCK'],
+};
+
 // ── Role → station-type filter (null = see all) ───────────────────────────
 // Used on Tracking, Vehicles and Dashboard to restrict views by role.
 export const ROLE_STATION = {

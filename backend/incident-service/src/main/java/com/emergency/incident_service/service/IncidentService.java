@@ -1,6 +1,7 @@
 package com.emergency.incident_service.service;
 
 import com.emergency.incident_service.domain.enums.IncidentStatus;
+import com.emergency.incident_service.domain.enums.IncidentType;
 import com.emergency.incident_service.domain.model.Incident;
 import com.emergency.incident_service.dto.AssignUnitRequest;
 import com.emergency.incident_service.dto.CreateIncidentRequest;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -114,22 +116,22 @@ public class IncidentService {
         return toResponse(incident);
     }
 
-    /** GET /incidents/open – all non-resolved incidents */
+    /** GET /incidents/open – open incidents, optionally filtered by type */
     @Transactional(readOnly = true)
-    public List<IncidentResponse> getOpenIncidents() {
-        return incidentRepository.findByStatusNot(IncidentStatus.RESOLVED)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public List<IncidentResponse> getOpenIncidents(Collection<IncidentType> types) {
+        List<Incident> incidents = (types == null)
+                ? incidentRepository.findByStatusNot(IncidentStatus.RESOLVED)
+                : incidentRepository.findByStatusNotAndIncidentTypeIn(IncidentStatus.RESOLVED, types);
+        return incidents.stream().map(this::toResponse).toList();
     }
 
-    /** GET /incidents – all incidents */
+    /** GET /incidents – all incidents, optionally filtered by type */
     @Transactional(readOnly = true)
-    public List<IncidentResponse> getAllIncidents() {
-        return incidentRepository.findAll()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public List<IncidentResponse> getAllIncidents(Collection<IncidentType> types) {
+        List<Incident> incidents = (types == null)
+                ? incidentRepository.findAll()
+                : incidentRepository.findByIncidentTypeIn(types);
+        return incidents.stream().map(this::toResponse).toList();
     }
 
     /** DELETE /incidents/:id */

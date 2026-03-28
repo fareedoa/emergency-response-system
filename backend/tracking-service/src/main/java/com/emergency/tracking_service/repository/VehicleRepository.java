@@ -1,5 +1,6 @@
 package com.emergency.tracking_service.repository;
 
+import com.emergency.tracking_service.domain.enums.StationType;
 import com.emergency.tracking_service.domain.enums.VehicleStatus;
 import com.emergency.tracking_service.domain.enums.VehicleType;
 import com.emergency.tracking_service.domain.model.Vehicle;
@@ -22,4 +23,6 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     List<Vehicle> findByStatusAndVehicleTypeIn(VehicleStatus status, List<VehicleType> types);
 
     List<Vehicle> findByStationIdAndStatus(UUID stationId, VehicleStatus status);
+
+    List<Vehicle> findByStationType(StationType stationType);
 }

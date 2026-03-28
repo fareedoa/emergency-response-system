@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { trackingApi } from '../api';
 import { PageHeader, Card, DataTable, Btn, Modal, Field, Input, Select } from '../components/UI';
-import { STATION_TYPES } from '../utils/constants';
+import { STATION_TYPES, ROLE_STATION } from '../utils/constants';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -31,12 +32,18 @@ async function geocodeNominatim(query) {
 }
 
 export default function Facilities() {
+  const { user } = useAuth();
+  const allowedStationType = ROLE_STATION[user?.role] ?? null;
+  const visibleStationTypes = allowedStationType
+    ? STATION_TYPES.filter(s => s.value === allowedStationType)
+    : STATION_TYPES;
+
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({ name: '', stationType: '', latitude: '', longitude: '' });
+  const [form, setForm] = useState({ name: '', stationType: allowedStationType ?? '', latitude: '', longitude: '' });
   const [locationSearch, setLocationSearch] = useState('');
   const [searching, setSearching] = useState(false);
   const [mapCenter, setMapCenter] = useState(GHANA_CENTER);
@@ -145,7 +152,7 @@ export default function Facilities() {
           <Field label="Facility Type" required>
             <Select value={form.stationType} onChange={e => setForm(p => ({...p, stationType: e.target.value}))}>
               <option value="">Select type...</option>
-              {STATION_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {visibleStationTypes.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </Select>
           </Field>
 

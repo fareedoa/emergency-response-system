@@ -1,5 +1,6 @@
 package com.emergency.tracking_service.service;
 
+import com.emergency.tracking_service.domain.enums.StationType;
 import com.emergency.tracking_service.domain.enums.VehicleStatus;
 import com.emergency.tracking_service.domain.enums.VehicleType;
 import com.emergency.tracking_service.domain.model.Vehicle;
@@ -46,10 +47,11 @@ public class VehicleService {
     }
 
     @Transactional(readOnly = true)
-    public List<VehicleResponse> getAllVehicles() {
-        return vehicleRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+    public List<VehicleResponse> getAllVehicles(StationType filter) {
+        List<Vehicle> vehicles = (filter == null)
+                ? vehicleRepository.findAll()
+                : vehicleRepository.findByStationType(filter);
+        return vehicles.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     /**

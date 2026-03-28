@@ -30,6 +30,7 @@ public class AnalyticsController {
      * Any authenticated user.
      */
     @GetMapping("/response-times")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(
         summary = "Average response times",
         description = """
@@ -48,6 +49,7 @@ public class AnalyticsController {
      * Any authenticated user.
      */
     @GetMapping("/incidents-by-region")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(
         summary = "Incident frequency heat-map by region",
         description = """
@@ -66,6 +68,7 @@ public class AnalyticsController {
      * Any authenticated user.
      */
     @GetMapping("/resource-utilization")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(
         summary = "Per-station resource utilization",
         description = """
@@ -103,6 +106,7 @@ public class AnalyticsController {
      * Any authenticated user.
      */
     @GetMapping("/incident-trends")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(
         summary = "Rolling incident volume trends",
         description = """
@@ -121,6 +125,7 @@ public class AnalyticsController {
      * Any authenticated user.
      */
     @GetMapping("/peak-hours")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(
         summary = "Peak incident hours",
         description = """
@@ -157,6 +162,7 @@ public class AnalyticsController {
      * Any authenticated user.
      */
     @GetMapping("/summary-dashboard")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(
         summary = "KPI summary dashboard",
         description = """

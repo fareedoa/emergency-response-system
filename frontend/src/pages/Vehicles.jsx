@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { trackingApi } from '../api';
 import { PageHeader, Card, DataTable, SectionTitle, Btn, VehicleStatusBadge, Modal, Field, Input, Select, VehicleIcon, Spinner } from '../components/UI';
-import { VEHICLE_TYPES, VEHICLE_STATUSES, VEHICLE_STATUS_COLORS, STATION_TYPES, ROLE_STATION } from '../utils/constants';
+import { VEHICLE_TYPES, VEHICLE_STATUSES, VEHICLE_STATUS_COLORS, STATION_TYPES, ROLE_STATION, ROLE_VEHICLE_TYPES } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Truck, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -9,6 +9,10 @@ import toast from 'react-hot-toast';
 export default function Vehicles() {
   const { user } = useAuth();
   const stationFilter = ROLE_STATION[user?.role];
+  const allowedVehicleTypes = ROLE_VEHICLE_TYPES[user?.role] ?? null;
+  const visibleVehicleTypes = allowedVehicleTypes
+    ? VEHICLE_TYPES.filter(t => allowedVehicleTypes.includes(t.value))
+    : VEHICLE_TYPES;
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [filterType, setFilterType] = useState('');
@@ -105,7 +109,7 @@ export default function Vehicles() {
 
       {/* Summary cards */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px,1fr))', gap:14, marginBottom:22 }}>
-        {VEHICLE_TYPES.map(t => (
+        {visibleVehicleTypes.map(t => (
           <Card key={t.value} style={{ padding:'16px 18px', cursor:'pointer' }}
             onClick={() => setFilterType(filterType === t.value ? '' : t.value)}
             glowColor={filterType === t.value ? 'var(--color-brand)' : undefined}
@@ -142,7 +146,7 @@ export default function Vehicles() {
       <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
         <select value={filterType} onChange={e => setFilterType(e.target.value)} style={selStyle}>
           <option value="">All Types</option>
-          {VEHICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          {visibleVehicleTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selStyle}>
           <option value="">All Statuses</option>
@@ -167,7 +171,7 @@ export default function Vehicles() {
           <Field label="Vehicle Type" required>
             <Select value={form.vehicleType} onChange={e => setForm(p => ({...p, vehicleType: e.target.value}))}>
               <option value="">Select type...</option>
-              {VEHICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              {visibleVehicleTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </Select>
           </Field>
           <Field label="Assigned Station / Facility" required>

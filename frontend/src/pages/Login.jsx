@@ -7,9 +7,9 @@ import toast from 'react-hot-toast';
 // Role → landing page mapping
 const ROLE_HOME = {
   SYSTEM_ADMIN:   '/dashboard',
-  HOSPITAL_ADMIN: '/dashboard',
-  POLICE_ADMIN:   '/dashboard',
-  FIRE_ADMIN:     '/dashboard',
+  HOSPITAL_ADMIN: '/incidents',
+  POLICE_ADMIN:   '/incidents',
+  FIRE_ADMIN:     '/incidents',
 };
 
 export default function Login() {

@@ -1,5 +1,6 @@
 package com.emergency.incident_service.controller;
 
+import com.emergency.incident_service.domain.enums.IncidentType;
 import com.emergency.incident_service.dto.AssignUnitRequest;
 import com.emergency.incident_service.dto.CreateIncidentRequest;
 import com.emergency.incident_service.dto.IncidentResponse;
@@ -11,10 +12,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -25,8 +31,7 @@ public class IncidentController {
 
     private final IncidentService incidentService;
 
-    // Define constant for allowed roles to avoid repetition
-    private static final String HAS_ANY_ADMIN_ROLE = 
+    private static final String HAS_ANY_ADMIN_ROLE =
         "hasAnyRole('SYSTEM_ADMIN', 'HOSPITAL_ADMIN', 'POLICE_ADMIN', 'FIRE_ADMIN')";
 
     public IncidentController(IncidentService incidentService) {
@@ -34,142 +39,124 @@ public class IncidentController {
     }
 
     /**
-     * POST /incidents
-     * Creates a new incident report and automatically dispatches the nearest
-     * available responder based on incident type and GPS location.
+     * Returns the incident types the caller is allowed to access,
+     * or null for SYSTEM_ADMIN (unrestricted).
      */
+    private Collection<IncidentType> allowedTypes(Authentication auth) {
+        String role = auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .findFirst()
+                .map(a -> a.startsWith("ROLE_") ? a.substring(5) : a)
+                .orElse("SYSTEM_ADMIN");
+        return switch (role) {
+            case "HOSPITAL_ADMIN" -> Set.of(IncidentType.MEDICAL_EMERGENCY, IncidentType.ACCIDENT, IncidentType.OTHER);
+            case "POLICE_ADMIN"   -> Set.of(IncidentType.ROBBERY, IncidentType.CRIME, IncidentType.OTHER);
+            case "FIRE_ADMIN"     -> Set.of(IncidentType.FIRE, IncidentType.OTHER);
+            default               -> null; // SYSTEM_ADMIN — unrestricted
+        };
+    }
+
     @PostMapping
     @PreAuthorize(HAS_ANY_ADMIN_ROLE)
     @Operation(
         summary = "Create a new incident",
         description = """
-            Records an emergency incident report and automatically dispatches the nearest
-            available responder:
-            - ROBBERY / CRIME → nearest Police Station
-            - FIRE            → nearest Fire Service Station
-            - MEDICAL_EMERGENCY → nearest available Ambulance
-            
-            Returns DISPATCHED status if a responder was assigned, or CREATED if none were available.
+            Records an emergency incident and automatically dispatches the nearest available responder.
+            Department admins may only create incidents matching their department.
+            - HOSPITAL_ADMIN: MEDICAL_EMERGENCY, ACCIDENT
+            - POLICE_ADMIN:   ROBBERY, CRIME
+            - FIRE_ADMIN:     FIRE
+            - SYSTEM_ADMIN:   any type
             """
     )
     public ResponseEntity<IncidentResponse> createIncident(
-            @Valid @RequestBody CreateIncidentRequest request) {
+            @Valid @RequestBody CreateIncidentRequest request,
+            Authentication auth) {
+        Collection<IncidentType> allowed = allowedTypes(auth);
+        if (allowed != null && !allowed.contains(request.getIncidentType())) {
+            throw new AccessDeniedException("You may only create incidents of types: " + allowed);
+        }
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(incidentService.createIncident(request));
     }
 
-    /**
-     * GET /incidents/open
-     * Must be declared BEFORE /incidents/{id} to avoid Spring treating "open" as a UUID path variable.
-     */
     @GetMapping("/open")
     @PreAuthorize(HAS_ANY_ADMIN_ROLE)
-    @Operation(
-        summary = "Get all open incidents",
-        description = "Returns all incidents with status CREATED, DISPATCHED, or IN_PROGRESS."
-    )
-    public ResponseEntity<List<IncidentResponse>> getOpenIncidents() {
-        return ResponseEntity.ok(incidentService.getOpenIncidents());
+    @Operation(summary = "Get open incidents", description = "Returns open incidents scoped to the caller's department.")
+    public ResponseEntity<List<IncidentResponse>> getOpenIncidents(Authentication auth) {
+        return ResponseEntity.ok(incidentService.getOpenIncidents(allowedTypes(auth)));
     }
 
-    /**
-     * GET /incidents
-     */
     @GetMapping
     @PreAuthorize(HAS_ANY_ADMIN_ROLE)
-    @Operation(
-        summary = "Get all incidents",
-        description = "Returns all incidents regardless of status."
-    )
-    public ResponseEntity<List<IncidentResponse>> getAllIncidents() {
-        return ResponseEntity.ok(incidentService.getAllIncidents());
+    @Operation(summary = "Get all incidents", description = "Returns incidents scoped to the caller's department.")
+    public ResponseEntity<List<IncidentResponse>> getAllIncidents(Authentication auth) {
+        return ResponseEntity.ok(incidentService.getAllIncidents(allowedTypes(auth)));
     }
 
-    /**
-     * GET /incidents/:id
-     */
     @GetMapping("/{id}")
     @PreAuthorize(HAS_ANY_ADMIN_ROLE)
-    @Operation(
-        summary = "Get incident by ID",
-        description = "Retrieves the full details of a specific incident."
-    )
-    public ResponseEntity<IncidentResponse> getIncident(@PathVariable UUID id) {
-        return ResponseEntity.ok(incidentService.getIncident(id));
+    @Operation(summary = "Get incident by ID", description = "Retrieves a specific incident if it belongs to the caller's department.")
+    public ResponseEntity<IncidentResponse> getIncident(@PathVariable UUID id, Authentication auth) {
+        IncidentResponse incident = incidentService.getIncident(id);
+        Collection<IncidentType> allowed = allowedTypes(auth);
+        if (allowed != null && !allowed.contains(incident.getIncidentType())) {
+            throw new AccessDeniedException("Access denied to this incident.");
+        }
+        return ResponseEntity.ok(incident);
     }
 
-    /**
-     * DELETE /incidents/:id
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    @Operation(
-        summary = "Delete incident",
-        description = "Deletes an incident and frees any assigned responder. Requires SYSTEM_ADMIN role."
-    )
+    @Operation(summary = "Delete incident", description = "Deletes an incident. Requires SYSTEM_ADMIN.")
     public ResponseEntity<Void> deleteIncident(@PathVariable UUID id) {
         incidentService.deleteIncident(id);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * GET /incidents/:id/notes
-     */
     @GetMapping("/{id}/notes")
     @PreAuthorize(HAS_ANY_ADMIN_ROLE)
-    @Operation(
-        summary = "Get incident notes",
-        description = "Retrieves the notes associated with a specific incident."
-    )
-    public ResponseEntity<String> getIncidentNotes(@PathVariable UUID id) {
+    @Operation(summary = "Get incident notes", description = "Returns notes for an incident in the caller's department.")
+    public ResponseEntity<String> getIncidentNotes(@PathVariable UUID id, Authentication auth) {
+        IncidentResponse incident = incidentService.getIncident(id);
+        Collection<IncidentType> allowed = allowedTypes(auth);
+        if (allowed != null && !allowed.contains(incident.getIncidentType())) {
+            throw new AccessDeniedException("Access denied to this incident.");
+        }
         return ResponseEntity.ok(incidentService.getIncidentNotes(id));
     }
 
-    /**
-     * GET /incidents/:id/timeline
-     */
     @GetMapping("/{id}/timeline")
     @PreAuthorize(HAS_ANY_ADMIN_ROLE)
-    @Operation(
-        summary = "Get incident timeline",
-        description = "Retrieves the complete audit history of an incident's status and modifications."
-    )
-    public ResponseEntity<List<com.emergency.incident_service.dto.IncidentTimelineResponse>> getIncidentTimeline(@PathVariable UUID id) {
+    @Operation(summary = "Get incident timeline", description = "Returns the audit history for an incident in the caller's department.")
+    public ResponseEntity<List<com.emergency.incident_service.dto.IncidentTimelineResponse>> getIncidentTimeline(
+            @PathVariable UUID id, Authentication auth) {
+        IncidentResponse incident = incidentService.getIncident(id);
+        Collection<IncidentType> allowed = allowedTypes(auth);
+        if (allowed != null && !allowed.contains(incident.getIncidentType())) {
+            throw new AccessDeniedException("Access denied to this incident.");
+        }
         return ResponseEntity.ok(incidentService.getIncidentTimeline(id));
     }
 
-    /**
-     * PUT /incidents/:id/status
-     */
     @PutMapping("/{id}/status")
     @PreAuthorize(HAS_ANY_ADMIN_ROLE)
-    @Operation(
-        summary = "Update incident status",
-        description = """
-            Transitions the incident to a new status (CREATED → DISPATCHED → IN_PROGRESS → RESOLVED).
-            When an incident is resolved, the assigned responder is automatically marked available again.
-            """
-    )
+    @Operation(summary = "Update incident status", description = "Updates the status of an incident in the caller's department.")
     public ResponseEntity<IncidentResponse> updateStatus(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateStatusRequest request) {
+            @Valid @RequestBody UpdateStatusRequest request,
+            Authentication auth) {
+        IncidentResponse incident = incidentService.getIncident(id);
+        Collection<IncidentType> allowed = allowedTypes(auth);
+        if (allowed != null && !allowed.contains(incident.getIncidentType())) {
+            throw new AccessDeniedException("Access denied to this incident.");
+        }
         return ResponseEntity.ok(incidentService.updateStatus(id, request));
     }
 
-    /**
-     * PUT /incidents/:id/assign
-     */
     @PutMapping("/{id}/assign")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    @Operation(
-        summary = "Manually assign a responder/unit",
-        description = """
-            Overrides the auto-dispatched responder. 
-            The previously assigned responder (if any) is freed and the new one is marked unavailable.
-            
-            Requires ROLE_SYSTEM_ADMIN.
-            """
-    )
+    @Operation(summary = "Manually assign a responder/unit", description = "Overrides auto-dispatch. Requires SYSTEM_ADMIN.")
     public ResponseEntity<IncidentResponse> assignResponder(
             @PathVariable UUID id,
             @Valid @RequestBody AssignUnitRequest request) {

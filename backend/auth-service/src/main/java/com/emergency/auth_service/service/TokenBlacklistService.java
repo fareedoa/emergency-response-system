@@ -24,6 +24,11 @@ public class TokenBlacklistService {
     }
 
     public boolean isBlacklisted(String token) {
-        return redisTemplate.hasKey(BLACKLIST_PREFIX + token);
+        try {
+            return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + token));
+        } catch (Exception e) {
+            // Redis unavailable — treat token as not blacklisted so auth still works
+            return false;
+        }
     }
 }

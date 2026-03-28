@@ -33,10 +33,13 @@ function makeClient(baseURL) {
     res => res,
     async err => {
       const orig = err.config;
-      if (err.response?.status === 401 && !orig._retry) {
+      const refreshToken = getRefresh();
+      // Only attempt token refresh if: status is 401, not already retried, AND a refresh token exists.
+      // Without this guard, a failed login (no refresh token) would trigger a full page reload.
+      if (err.response?.status === 401 && !orig._retry && refreshToken) {
         orig._retry = true;
         try {
-          const { data } = await axios.post(`${URLS.AUTH}/auth/refresh-token`, { refreshToken: getRefresh() });
+          const { data } = await axios.post(`${URLS.AUTH}/auth/refresh-token`, { refreshToken });
           setToken(data.accessToken);
           orig.headers.Authorization = `Bearer ${data.accessToken}`;
           return c(orig);

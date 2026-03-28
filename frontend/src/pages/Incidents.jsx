@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { incidentApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader, Btn, DataTable, StatusBadge, SeverityBadge, TypeBadge, Card, Spinner } from '../components/UI';
-import { INCIDENT_TYPES, SEVERITY_LEVELS, INCIDENT_STATUSES, fmtDateTime, timeAgo } from '../utils/constants';
+import { INCIDENT_TYPES, SEVERITY_LEVELS, INCIDENT_STATUSES, ROLE_INCIDENT_TYPES, fmtDateTime, timeAgo } from '../utils/constants';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,7 +30,9 @@ const inputSel = {
 
 export default function Incidents() {
   const navigate = useNavigate();
-  const { is } = useAuth();
+  const { user, is } = useAuth();
+  const allowedTypes = ROLE_INCIDENT_TYPES[user?.role] ?? null;
+  const visibleTypes = allowedTypes ? INCIDENT_TYPES.filter(t => allowedTypes.includes(t.value)) : INCIDENT_TYPES;
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('');
@@ -153,7 +155,7 @@ export default function Incidents() {
         </div>
         <select value={filter.type} onChange={e => setFilter(f => ({ ...f, type: e.target.value }))} style={inputSel}>
           <option value="">All Types</option>
-          {INCIDENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          {visibleTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
         <select value={filter.severity} onChange={e => setFilter(f => ({ ...f, severity: e.target.value }))} style={inputSel}>
           <option value="">All Severities</option>

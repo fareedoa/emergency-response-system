@@ -1,5 +1,6 @@
 package com.emergency.tracking_service.service;
 
+import com.emergency.tracking_service.domain.enums.StationType;
 import com.emergency.tracking_service.domain.model.Station;
 import com.emergency.tracking_service.dto.CreateStationRequest;
 import com.emergency.tracking_service.dto.StationResponse;
@@ -40,10 +41,11 @@ public class StationService {
     }
 
     @Transactional(readOnly = true)
-    public List<StationResponse> getAllStations() {
-        return stationRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+    public List<StationResponse> getAllStations(StationType filter) {
+        List<Station> stations = (filter == null)
+                ? stationRepository.findAll()
+                : stationRepository.findByStationType(filter);
+        return stations.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional

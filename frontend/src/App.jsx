@@ -48,7 +48,11 @@ export default function App() {
                 <AppLayout />
               </ProtectedRoute>
             }>
-              <Route path="/dashboard"    element={<Dashboard />} />
+              <Route path="/dashboard" element={
+                <ProtectedRoute roles={['SYSTEM_ADMIN']}>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
               <Route path="/incidents"    element={<Incidents />} />
               <Route path="/incidents/new" element={
                 <ProtectedRoute roles={['SYSTEM_ADMIN','HOSPITAL_ADMIN','POLICE_ADMIN','FIRE_ADMIN']}>
@@ -59,7 +63,11 @@ export default function App() {
               <Route path="/tracking"     element={<Tracking />} />
               <Route path="/facilities"   element={<Facilities />} />
               <Route path="/vehicles"     element={<Vehicles />} />
-              <Route path="/analytics"    element={<Analytics />} />
+              <Route path="/analytics" element={
+                <ProtectedRoute roles={['SYSTEM_ADMIN']}>
+                  <Analytics />
+                </ProtectedRoute>
+              } />
               <Route path="/users" element={
                 <ProtectedRoute roles={['SYSTEM_ADMIN']}>
                   <Users />

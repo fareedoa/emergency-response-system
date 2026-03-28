@@ -39,17 +39,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String jwt = parseJwt(request);
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
                 String username = jwtUtils.getUsernameFromToken(jwt);
-                
+
                 // Fetch the authoritative user profile from auth-service via OpenFeign
                 UserProfileResponse profile = authServiceClient.getProfile("Bearer " + jwt);
-                
-                // Construct the role authority (auth-service returns 'SYSTEM_ADMIN' without ROLE_ prefix usually, 
+
+                // Construct the role authority (auth-service returns 'SYSTEM_ADMIN' without ROLE_ prefix usually,
                 // but let's ensure it has ROLE_ for Spring Security)
                 String role = profile.getRole();
                 if (role != null && !role.startsWith("ROLE_")) {
                     role = "ROLE_" + role;
                 }
-                
+
                 List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
 
                 UsernamePasswordAuthenticationToken authentication =
