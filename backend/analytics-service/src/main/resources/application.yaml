@@ -9,12 +9,12 @@ spring:
     incident:
       jdbc-url: ${INCIDENT_DB_URL:${DATABASE_URL_INCIDENT}}
       username: ${DATABASE_USERNAME}
-      password: ${INCIDENT_DB_PASSWORD}
+      password: ${DATABASE_PASSWORD}
       driver-class-name: org.postgresql.Driver
     tracking:
       jdbc-url: ${TRACKING_DB_URL:${DATABASE_URL_TRACKING}}
       username: ${DATABASE_USERNAME}
-      password: ${TRACKING_DB_PASSWORD}
+      password: ${DATABASE_PASSWORD}
       driver-class-name: org.postgresql.Driver
 
   jpa:
