@@ -1,20 +1,4 @@
-
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: ers-postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "0000"
-      POSTGRES_DB: postgres
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    networks:
-      - ers-network
-
   redis:
     image: redis:7-alpine
     container_name: ers-redis
@@ -38,21 +22,19 @@ services:
   auth-service:
     build:
       context: ./auth-service
-      dockerfile: Dockerfile
     container_name: ers-auth-service
     ports:
       - "8081:8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      - DATABASE_URL=jdbc:postgresql://postgres:5432/auth_db
-      - DATABASE_USERNAME=postgres
-      - DATABASE_PASSWORD=0000
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - SECRET_KEY=vNhpXqI4ZNInZ94Ka8Husuq0hdV5G0FSxy7GkMP5F84=
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://ep-tiny-haze-alhosxxv-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      DATABASE_USERNAME: neondb_owner
+      DATABASE_PASSWORD: npg_esNV0tJ7oMPp
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SECRET_KEY: vNhpXqI4ZNInZ94Ka8Husuq0hdV5G0FSxy7GkMP5F84=
     depends_on:
-      - postgres
       - redis
     networks:
       - ers-network
@@ -60,77 +42,71 @@ services:
   incident-service:
     build:
       context: ./incident-service
-      dockerfile: Dockerfile
     container_name: ers-incident-service
     ports:
       - "8082:8082"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      - DATABASE_URL=jdbc:postgresql://postgres:5432/incident_db
-      - DATABASE_USERNAME=postgres
-      - DATABASE_PASSWORD=0000
-      - RABBITMQ_HOST=rabbitmq
-      - SECRET_KEY=vNhpXqI4ZNInZ94Ka8Husuq0hdV5G0FSxy7GkMP5F84=
-      - AUTH_SERVICE_URL=http://auth-service:8081
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://ep-aged-snow-agkhfmzm-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      DATABASE_USERNAME: neondb_owner
+      DATABASE_PASSWORD: npg_92lgqKQHAeZd
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      RABBITMQ_HOST: rabbitmq
+      SECRET_KEY: vNhpXqI4ZNInZ94Ka8Husuq0hdV5G0FSxy7GkMP5F84=
+      AUTH_SERVICE_URL: http://auth-service:8081
     depends_on:
-      - postgres
       - rabbitmq
+      - auth-service
     networks:
       - ers-network
 
   tracking-service:
     build:
       context: ./tracking-service
-      dockerfile: Dockerfile
     container_name: ers-tracking-service
     ports:
       - "8083:8083"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      - DATABASE_URL=jdbc:postgresql://postgres:5432/tracking_db
-      - DATABASE_USERNAME=postgres
-      - DATABASE_PASSWORD=0000
-      - RABBITMQ_HOST=rabbitmq
-      - SECRET_KEY=vNhpXqI4ZNInZ94Ka8Husuq0hdV5G0FSxy7GkMP5F84=
-      - AUTH_SERVICE_URL=http://auth-service:8081
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://ep-empty-wildflower-ag2ksppo-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      DATABASE_USERNAME: neondb_owner
+      DATABASE_PASSWORD: npg_3oCv8bFMUNpP
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      RABBITMQ_HOST: rabbitmq
+      SECRET_KEY: vNhpXqI4ZNInZ94Ka8Husuq0hdV5G0FSxy7GkMP5F84=
+      AUTH_SERVICE_URL: http://auth-service:8081
     depends_on:
-      - postgres
       - rabbitmq
+      - auth-service
     networks:
       - ers-network
 
   analytics-service:
     build:
       context: ./analytics-service
-      dockerfile: Dockerfile
     container_name: ers-analytics-service
     ports:
       - "8084:8084"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      - DATABASE_URL_INCIDENT=jdbc:postgresql://postgres:5432/incident_db
-      - DATABASE_URL_TRACKING=jdbc:postgresql://postgres:5432/tracking_db
-      - DATABASE_USERNAME=postgres
-      - DATABASE_PASSWORD=0000
-      - RABBITMQ_HOST=rabbitmq
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - SECRET_KEY=vNhpXqI4ZNInZ94Ka8Husuq0hdV5G0FSxy7GkMP5F84=
-      - AUTH_SERVICE_URL=http://auth-service:8081
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL_INCIDENT: jdbc:postgresql://ep-aged-snow-agkhfmzm-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      DATABASE_URL_TRACKING: jdbc:postgresql://ep-empty-wildflower-ag2ksppo-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      DATABASE_USERNAME: neondb_owner
+      INCIDENT_DB_PASSWORD: npg_92lgqKQHAeZd
+      TRACKING_DB_PASSWORD: npg_3oCv8bFMUNpP
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      RABBITMQ_HOST: rabbitmq
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SECRET_KEY: vNhpXqI4ZNInZ94Ka8Husuq0hdV5G0FSxy7GkMP5F84=
+      AUTH_SERVICE_URL: http://auth-service:8081
     depends_on:
-      - postgres
       - rabbitmq
       - redis
+      - auth-service
     networks:
       - ers-network
 
 networks:
   ers-network:
     driver: bridge
-
-volumes:
-  postgres-data: {}
-  
