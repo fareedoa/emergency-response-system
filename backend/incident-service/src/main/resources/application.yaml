@@ -26,13 +26,13 @@ spring:
     baseline-version: 0
 
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
+    host: ${RABBITMQ_HOST}
     port: ${RABBITMQ_PORT:5671}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: ${RABBITMQ_VHOST}
     ssl:
       enabled: ${RABBITMQ_SSL_ENABLED:true}
-      virtual-host: ${RABBITMQ_VHOST:/}
     listener:
       simple:
         acknowledge-mode: auto
