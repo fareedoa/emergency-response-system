@@ -5,7 +5,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-@FeignClient(name = "auth-service", url = "${AUTH_SERVICE_URL:http://localhost:8081}")
+@FeignClient(name = "auth-service", url = "${AUTH_SERVICE_URL:https://emergency-response-system-8518.onrender.com}")
 public interface AuthServiceClient {
 
     @GetMapping("/auth/profile")

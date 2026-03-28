@@ -12,7 +12,7 @@ import java.util.List;
  * The /vehicles/available endpoint is permit-all in the tracking-service security config,
  * so no auth header is required.
  */
-@FeignClient(name = "tracking-service", url = "${TRACKING_SERVICE_URL:http://localhost:8083}")
+@FeignClient(name = "tracking-service", url = "${TRACKING_SERVICE_URL:https://emergency-response-system-2-52xb.onrender.com}")
 public interface TrackingServiceClient {
 
     @GetMapping("/vehicles/available")
