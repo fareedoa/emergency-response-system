@@ -11,6 +11,26 @@ import { AlertTriangle, ClipboardList, Send, Check } from 'lucide-react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 
+// Mirrors ResponderDispatchService.java mapToVehicleTypes()
+const INCIDENT_VEHICLE_TYPES = {
+  MEDICAL_EMERGENCY: ['AMBULANCE'],
+  ACCIDENT:          ['AMBULANCE'],
+  FIRE:              ['FIRE_TRUCK'],
+  CRIME:             ['POLICE_CAR', 'PATROL_BIKE'],
+  ROBBERY:           ['POLICE_CAR', 'PATROL_BIKE'],
+  OTHER:             null, // no restriction — show all types
+};
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+    * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // Custom marker for showing incident position
 const incidentPin = L.divIcon({
   html: `
@@ -130,9 +150,50 @@ export default function IncidentDetail() {
 
   const handleOpenDispatch = async () => {
     setDispatchModal(true);
+    setVehicles([]);
+    setSelectedUnit('');
     try {
-      const res = await trackingApi.listVehicles();
-      setVehicles(res.data || []);
+      const [vRes, sRes] = await Promise.all([
+        trackingApi.listVehicles(),
+        trackingApi.listStations().catch(() => ({ data: [] })),
+      ]);
+      const stationById = Object.fromEntries(
+        (sRes.data || []).map(s => [String(s.id), s])
+      );
+
+      // Filter by availability
+      const available = (vRes.data || []).filter(v =>
+        ['AVAILABLE', 'IDLE', 'PATROLLING'].includes(v.status)
+      );
+
+      // Filter by vehicle types appropriate for this incident type
+      const allowed = INCIDENT_VEHICLE_TYPES[incident.incidentType];
+      const typed = allowed ? available.filter(v => allowed.includes(v.vehicleType)) : available;
+
+      // Compute distance to incident using GPS or station coordinates
+      const withDist = typed.map(v => {
+        let distKm = null;
+        if (v.currentLat != null && v.currentLng != null) {
+          distKm = haversineKm(incident.latitude, incident.longitude, v.currentLat, v.currentLng);
+        } else {
+          const st = stationById[String(v.stationId)];
+          if (st?.latitude != null) {
+            distKm = haversineKm(incident.latitude, incident.longitude, st.latitude, st.longitude);
+          }
+        }
+        return { ...v, _distKm: distKm };
+      });
+
+      // Sort nearest first (vehicles without coordinates go last)
+      withDist.sort((a, b) => {
+        if (a._distKm == null && b._distKm == null) return 0;
+        if (a._distKm == null) return 1;
+        if (b._distKm == null) return -1;
+        return a._distKm - b._distKm;
+      });
+
+      setVehicles(withDist);
+      if (withDist.length > 0) setSelectedUnit(withDist[0].id); // auto-select nearest
     } catch { toast.error('Failed to load vehicles'); }
   };
 
@@ -401,14 +462,14 @@ export default function IncidentDetail() {
       <Modal open={dispatchModal} onClose={() => setDispatchModal(false)} title="Manual Unit Dispatch">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Select an available unit to dispatch to this incident.
+            Units are filtered by incident type and sorted by proximity. The nearest unit is pre-selected.
           </div>
-          
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
-            {vehicles.filter(v => ['AVAILABLE', 'IDLE', 'PATROLLING'].includes(v.status)).length === 0 ? (
-              <Empty icon={<VehicleIcon type="POLICE_CAR" size={40} />} title="No available units" msg="There are currently no idle or patrolling units to dispatch." />
+            {vehicles.length === 0 ? (
+              <Empty icon={<VehicleIcon type="POLICE_CAR" size={40} />} title="No available units" msg="There are no available units of the appropriate type nearby." />
             ) : (
-              vehicles.filter(v => ['AVAILABLE', 'IDLE', 'PATROLLING'].includes(v.status)).map(v => (
+              vehicles.map((v, idx) => (
                 <button key={v.id} type="button" onClick={() => setSelectedUnit(v.id)}
                   style={{
                     padding: '12px', borderRadius: 'var(--r-md)', textAlign: 'left',
@@ -420,8 +481,22 @@ export default function IncidentDetail() {
                     <VehicleIcon type={v.vehicleType} size={16} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{v.registration}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{v.vehicleType?.replace('_', ' ')} · {v.status}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {v.registration}
+                      {idx === 0 && (
+                        <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--color-success)', background: 'color-mix(in srgb, var(--color-success) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-success) 30%, transparent)', padding: '2px 6px', borderRadius: 'var(--r-full)', letterSpacing: '0.05em' }}>
+                          NEAREST
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                      {v.vehicleType?.replace(/_/g, ' ')} · {v.status}
+                      {v._distKm != null && (
+                        <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {v._distKm < 1 ? `${(v._distKm * 1000).toFixed(0)} m` : `${v._distKm.toFixed(1)} km`}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))
