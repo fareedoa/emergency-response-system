@@ -155,11 +155,17 @@ public class IncidentController {
     }
 
     @PutMapping("/{id}/assign")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    @Operation(summary = "Manually assign a responder/unit", description = "Overrides auto-dispatch. Requires SYSTEM_ADMIN.")
+    @PreAuthorize(HAS_ANY_ADMIN_ROLE)
+    @Operation(summary = "Manually assign a responder/unit", description = "Overrides auto-dispatch. Department admins may only dispatch to incidents within their department.")
     public ResponseEntity<IncidentResponse> assignResponder(
             @PathVariable UUID id,
-            @Valid @RequestBody AssignUnitRequest request) {
+            @Valid @RequestBody AssignUnitRequest request,
+            Authentication auth) {
+        IncidentResponse incident = incidentService.getIncident(id);
+        Collection<IncidentType> allowed = allowedTypes(auth);
+        if (allowed != null && !allowed.contains(incident.getIncidentType())) {
+            throw new AccessDeniedException("You may only dispatch to incidents within your department.");
+        }
         return ResponseEntity.ok(incidentService.assignResponder(id, request));
     }
 }

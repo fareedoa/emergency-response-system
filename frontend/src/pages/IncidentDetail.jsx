@@ -64,7 +64,7 @@ const vehiclePin = (vehicleType, status) => {
 export default function IncidentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAnyAdmin } = useAuth();
   const [incident, setIncident] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -163,7 +163,7 @@ export default function IncidentDetail() {
         subtitle={<span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>ID: {incident.id}</span>}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
-            {isAdmin() && (
+            {isAnyAdmin() && (
               <Btn variant="ghost" size="sm" onClick={handleOpenDispatch}
                 icon={<Send size={13} />}
               >Manual Dispatch</Btn>

@@ -90,9 +90,10 @@ export function AuthProvider({ children }) {
   // Role helpers
   const is = (...roles) => roles.includes(user?.role);
   const isAdmin = () => is('SYSTEM_ADMIN');
+  const isAnyAdmin = () => is('SYSTEM_ADMIN', 'HOSPITAL_ADMIN', 'POLICE_ADMIN', 'FIRE_ADMIN');
 
   return (
-    <Ctx.Provider value={{ user, loading, login, register, logout, is, isAdmin }}>
+    <Ctx.Provider value={{ user, loading, login, register, logout, is, isAdmin, isAnyAdmin }}>
       {children}
     </Ctx.Provider>
   );
