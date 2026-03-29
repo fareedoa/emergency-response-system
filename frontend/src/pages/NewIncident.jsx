@@ -132,7 +132,7 @@ export default function NewIncident() {
         actions={<Btn variant="secondary" onClick={() => navigate('/incidents')}>← Back to Incidents</Btn>}
       />
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+        <div className="mob-1col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
           {/* ── LEFT ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <Card>
@@ -146,7 +146,7 @@ export default function NewIncident() {
               <SectionTitle>Incident Details</SectionTitle>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <Field label="Incident Type" required error={errors.incidentType}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <div className="mob-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                     {visibleTypes.map(type => {
                       const TypeIcon = type.Icon;
                       const isSelected = form.incidentType === type.value;
@@ -173,7 +173,7 @@ export default function NewIncident() {
                 )}
 
                 <Field label="Severity Level" required error={errors.severity}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+                  <div className="mob-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
                     {SEVERITY_LEVELS.map(sev => (
                       <button key={sev.value} type="button"
                         onClick={() => { setForm(f => ({ ...f, severity: sev.value })); setErrors(e => ({ ...e, severity: '' })); }}
@@ -232,7 +232,7 @@ export default function NewIncident() {
               </div>
 
               {/* Map */}
-              <div style={{ borderRadius: 'var(--r-md)', overflow: 'hidden', border: '1px solid var(--border-subtle)', height: 320 }}>
+              <div className="map-h-sm" style={{ borderRadius: 'var(--r-md)', overflow: 'hidden', border: '1px solid var(--border-subtle)', height: 320 }}>
                 <MapContainer
                   key={`${mapCenter[0]}-${mapCenter[1]}`}
                   center={mapCenter}

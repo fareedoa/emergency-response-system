@@ -155,7 +155,7 @@ export default function Analytics() {
       </div>
 
       {/* ── Trends + Fleet utilisation ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:20, marginBottom:20 }}>
+      <div className="mob-1col" style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:20, marginBottom:20 }}>
         <Card>
           <SectionTitle>Incident Trends (7 / 30 / 90 days)</SectionTitle>
           {trends.length > 0 ? (
@@ -207,7 +207,7 @@ export default function Analytics() {
       </div>
 
       {/* ── Response times + Peak hours ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+      <div className="mob-1col" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
         <Card>
           <SectionTitle>Response Times by Service Type (s)</SectionTitle>
           {respTimes.length > 0 ? (

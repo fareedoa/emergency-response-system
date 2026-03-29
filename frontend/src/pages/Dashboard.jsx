@@ -106,7 +106,7 @@ export default function Dashboard() {
             Live · refreshes in <span style={{ color: 'var(--color-brand)' }}>{countdown}s</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {criticalIncidents.length > 0 && (
             <AlertBanner color="var(--color-danger)" icon={<AlertTriangle size={14} />}>
               {criticalIncidents.length} CRITICAL incident{criticalIncidents.length > 1 ? 's' : ''} active
@@ -124,14 +124,14 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="mob-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
         <StatCard label="Incidents Today"   value={totalToday}  color="var(--color-brand)"    icon={<Activity size={18} />} />
         <StatCard label="Open"              value={openCount}   color="var(--color-danger)"   icon={<AlertTriangle size={18} />} />
         <StatCard label="Active Units"      value={activeUnits} color="var(--color-dispatch)" icon={<Truck size={18} />} />
         <StatCard label={kpi?.averageResponseTimeSeconds ? 'Avg Response' : 'Resolved'} value={avgResp} color="var(--color-success)" icon={<CheckCircle size={18} />} sub={kpi?.averageResponseTimeSeconds ? 'avg to dispatch' : 'total resolved'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
+      <div className="mob-1col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
         {/* Recent Incidents */}
         <Card>
           <SectionTitle>

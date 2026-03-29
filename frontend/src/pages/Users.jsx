@@ -137,7 +137,7 @@ export default function Users() {
       />
 
       {/* Role filter cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+      <div className="mob-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {roleCounts.map(r => {
           const color = ROLE_COLORS[r.value];
           const isActive = filterRole === r.value;

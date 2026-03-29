@@ -162,7 +162,7 @@ export default function IncidentDetail() {
         title="Incident Report"
         subtitle={<span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>ID: {incident.id}</span>}
         actions={
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {isAnyAdmin() && (
               <Btn variant="ghost" size="sm" onClick={handleOpenDispatch}
                 icon={<Send size={13} />}
@@ -182,8 +182,8 @@ export default function IncidentDetail() {
       />
 
       {/* ── Status Progress ── */}
-      <Card style={{ marginBottom: 20, padding: '20px 28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+      <Card className="status-progress-wrap" style={{ marginBottom: 20, padding: '20px 28px' }}>
+        <div className="status-progress-inner" style={{ display: 'flex', alignItems: 'center' }}>
           {statusSteps.map((step, i) => {
             const done = i <= currentStep;
             const active = i === currentStep;
@@ -223,7 +223,7 @@ export default function IncidentDetail() {
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
+      <div className="mob-1col" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
         {/* Left */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Header card */}

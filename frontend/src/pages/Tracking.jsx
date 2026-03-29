@@ -254,10 +254,10 @@ export default function Tracking() {
       </Card>
 
       {/* Sidebar + Map */}
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, alignItems: 'start' }}>
+      <div className="mob-1col" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, alignItems: 'start' }}>
 
         {/* Vehicle list */}
-        <Card style={{ padding: 0, maxHeight: 680, overflowY: 'auto' }}>
+        <Card className="tracking-list" style={{ padding: 0, maxHeight: 680, overflowY: 'auto' }}>
           <div style={{
             padding: '12px 16px', borderBottom: '1px solid var(--border-faint)',
             fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)',
@@ -385,7 +385,7 @@ export default function Tracking() {
             </div>
           </div>
 
-          <div style={{ height: 580 }}>
+          <div className="map-h-tracking" style={{ height: 580 }}>
             <MapContainer center={[7.95, -1.02]} zoom={7} style={{ width: '100%', height: '100%' }} zoomControl attributionControl>
               <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"

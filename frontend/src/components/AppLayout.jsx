@@ -211,7 +211,7 @@ export default function AppLayout() {
         </header>
 
         {/* Content */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg-void)', backgroundImage: `linear-gradient(var(--grid-overlay) 1px, transparent 1px), linear-gradient(90deg, var(--grid-overlay) 1px, transparent 1px)`, backgroundSize: '48px 48px' }}>
+        <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg-void)', backgroundImage: `linear-gradient(var(--grid-overlay) 1px, transparent 1px), linear-gradient(90deg, var(--grid-overlay) 1px, transparent 1px)`, backgroundSize: '48px 48px' }}>
           <Outlet />
         </main>
       </div>

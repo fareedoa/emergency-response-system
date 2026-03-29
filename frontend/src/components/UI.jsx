@@ -8,7 +8,7 @@ import {
 import { getTypeInfo, getStatusInfo } from '../utils/constants';
 
 // ── Layout primitives ──────────────────────────────────────────────────────
-export function Card({ children, style, glowColor, onClick }) {
+export function Card({ children, style, glowColor, onClick, className }) {
   const base = {
     background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--r-lg)', padding: 20, position: 'relative', overflow: 'hidden',
@@ -17,7 +17,7 @@ export function Card({ children, style, glowColor, onClick }) {
     ...(onClick && { cursor: 'pointer' }),
     ...style,
   };
-  return <div style={base} onClick={onClick}>{children}</div>;
+  return <div className={className} style={base} onClick={onClick}>{children}</div>;
 }
 
 export function PageHeader({ title, subtitle, actions }) {
@@ -27,7 +27,7 @@ export function PageHeader({ title, subtitle, actions }) {
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em', marginBottom: 4 }}>{title}</h1>
         {subtitle && <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{subtitle}</p>}
       </div>
-      {actions && <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>{actions}</div>}
+      {actions && <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>{actions}</div>}
     </div>
   );
 }
