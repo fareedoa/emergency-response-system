@@ -385,7 +385,7 @@ export default function Tracking() {
             </div>
           </div>
 
-          <div className="map-h-tracking" style={{ height: 580 }}>
+          <div className="map-h-tracking" style={{ height: 580, position: 'relative', zIndex: 0, isolation: 'isolate' }}>
             <MapContainer center={[7.95, -1.02]} zoom={7} style={{ width: '100%', height: '100%' }} zoomControl attributionControl>
               <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"

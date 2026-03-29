@@ -20,6 +20,7 @@ export default function Users() {
   const [modal, setModal]         = useState(false);
   const [saving, setSaving]       = useState(false);
   const [toggling, setToggling]   = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ open: false, user: null, activate: false });
   const [form, setForm]           = useState({ name: '', email: '', password: '', role: 'SYSTEM_ADMIN' });
 
   const load = () => {
@@ -32,9 +33,14 @@ export default function Users() {
 
   useEffect(() => { load(); }, []);
 
-  const handleToggle = async (u) => {
+  const handleToggle = (u) => {
     const activate = !(u.enabled ?? true);
-    if (!window.confirm(`${activate ? 'Activate' : 'Deactivate'} ${u.name}?`)) return;
+    setConfirmModal({ open: true, user: u, activate });
+  };
+
+  const handleConfirmToggle = async () => {
+    const { user: u, activate } = confirmModal;
+    setConfirmModal({ open: false, user: null, activate: false });
     setToggling(u.userId || u.id);
     try {
       if (activate) await authApi.activateUser(u.userId || u.id);
@@ -163,6 +169,48 @@ export default function Users() {
       <Card style={{ padding: 0 }}>
         <DataTable cols={cols} rows={displayed} emptyTitle="No users found" emptyMsg="Try adjusting your search or role filter." />
       </Card>
+
+      {/* Confirm activate/deactivate modal */}
+      <Modal
+        open={confirmModal.open}
+        onClose={() => setConfirmModal({ open: false, user: null, activate: false })}
+        title={confirmModal.activate ? 'Activate User' : 'Deactivate User'}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 'var(--r-sm)', flexShrink: 0,
+              background: confirmModal.activate ? 'var(--success-soft)' : 'var(--danger-soft)',
+              border: `1px solid ${confirmModal.activate ? 'var(--success-border)' : 'var(--danger-border)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {confirmModal.activate
+                ? <ToggleRight size={20} color="var(--color-success)" />
+                : <ToggleLeft  size={20} color="var(--color-danger)"  />}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
+                {confirmModal.activate ? 'Activate' : 'Deactivate'} <span style={{ color: confirmModal.activate ? 'var(--color-success)' : 'var(--color-danger)' }}>{confirmModal.user?.name}</span>?
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                {confirmModal.activate
+                  ? 'This user will be able to log in and access the system.'
+                  : 'This user will be immediately signed out and blocked from logging in.'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <Btn variant="secondary" type="button" onClick={() => setConfirmModal({ open: false, user: null, activate: false })}>Cancel</Btn>
+            <Btn
+              type="button"
+              onClick={handleConfirmToggle}
+              style={confirmModal.activate ? {} : { background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+            >
+              {confirmModal.activate ? 'Activate' : 'Deactivate'}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
 
       {/* Add user modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="Register New User">
