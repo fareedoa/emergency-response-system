@@ -6,6 +6,7 @@ import com.emergency.incident_service.dto.VehicleDto;
 import com.emergency.incident_service.exception.ResourceNotFoundException;
 import com.emergency.incident_service.messaging.HospitalCapacityListener;
 import com.emergency.incident_service.messaging.events.HospitalCapacityEvent;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -20,6 +21,9 @@ public class ResponderDispatchService {
     private final TrackingServiceClient    trackingClient;
     private final GeoCalculationService    geoCalcService;
     private final HospitalCapacityListener hospitalCapacityListener;
+
+    @Value("${app.dispatch.max-radius-km:50}")
+    private double maxDispatchRadiusKm;
 
     public ResponderDispatchService(TrackingServiceClient trackingClient,
                                     GeoCalculationService geoCalcService,
@@ -60,6 +64,18 @@ public class ResponderDispatchService {
         if (candidates.isEmpty()) {
             throw new ResourceNotFoundException(
                     "No available [" + vehicleTypes + "] vehicles with GPS at this time.");
+        }
+
+        // Filter out vehicles beyond the max dispatch radius
+        candidates = candidates.stream()
+                .filter(v -> geoCalcService.calculateDistanceKm(
+                        incidentLat, incidentLon,
+                        v.getCurrentLat(), v.getCurrentLng()) <= maxDispatchRadiusKm)
+                .toList();
+
+        if (candidates.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "No available [" + vehicleTypes + "] vehicles within " + maxDispatchRadiusKm + " km.");
         }
 
         return candidates.stream()

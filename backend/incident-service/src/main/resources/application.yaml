@@ -49,6 +49,8 @@ app:
     secret: ${SECRET_KEY}
     expiration-ms: 900000
     refresh-expiration-ms: 604800000
+  dispatch:
+    max-radius-km: 50
 
 springdoc:
   swagger-ui:
