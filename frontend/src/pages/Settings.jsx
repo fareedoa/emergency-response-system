@@ -71,7 +71,7 @@ export default function Settings() {
     setSavingPwd(true);
     try {
       await authApi.updatePassword({
-        currentPassword: pwd.current,
+        oldPassword: pwd.current,
         newPassword: pwd.next
       });
 
