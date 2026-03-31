@@ -387,7 +387,7 @@ export default function IncidentDetail() {
                       </div>
                       <div style={{ paddingTop: 4 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 3 }}>
-                          {event.fieldName || event.action || 'Status change'}
+                          {event.fieldName || event.action || (event.status ? `Status → ${event.status.replace(/_/g, ' ')}` : 'Status change')}
                         </div>
                         {event.oldValue && (
                           <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -396,7 +396,7 @@ export default function IncidentDetail() {
                           </div>
                         )}
                         <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
-                          {fmtDateTime(event.revisionDate || event.timestamp)} · {event.modifiedBy || 'System'}
+                          {fmtDateTime(event.revisionDate || event.timestamp || event.modifiedAt)} · {event.modifiedBy || 'System'}
                         </div>
                       </div>
                     </div>
