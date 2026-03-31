@@ -38,10 +38,6 @@ public class IncidentController {
         this.incidentService = incidentService;
     }
 
-    /**
-     * Returns the incident types the caller is allowed to access,
-     * or null for SYSTEM_ADMIN (unrestricted).
-     */
     private Collection<IncidentType> allowedTypes(Authentication auth) {
         String role = auth.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)

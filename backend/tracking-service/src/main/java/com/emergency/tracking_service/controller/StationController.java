@@ -31,7 +31,6 @@ public class StationController {
         this.stationService = stationService;
     }
 
-    /** Returns the StationType the caller is restricted to, or null for SYSTEM_ADMIN (unrestricted). */
     private StationType allowedStationType(Authentication auth) {
         String role = auth.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)

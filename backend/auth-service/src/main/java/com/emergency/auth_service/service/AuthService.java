@@ -182,7 +182,6 @@ public class AuthService {
             long remainingMs = jwtUtils.getRemainingExpiryMs(accessToken);
             tokenBlacklistService.blacklist(accessToken, remainingMs);
         }
-        // 2. Delete the refresh token from the database
         userRepository.findByEmail(email)
                 .ifPresent(refreshTokenService::deleteByUser);
     }

@@ -25,10 +25,6 @@ public class AnalyticsController {
         this.analyticsService = analyticsService;
     }
 
-    /**
-     * GET /analytics/response-times
-     * Any authenticated user.
-     */
     @GetMapping("/response-times")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(
